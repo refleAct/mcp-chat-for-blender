@@ -1,60 +1,159 @@
 """
-Claude Code CLI & agy CLI Integration Module
-Detects CLI availability, auto-configures MCP server in ~/.claude.json / agy configs,
-and provides subprocess execution bridges.
+Cross-Platform CLI Runner & Auto-Detector (Windows & Android Termux & Linux)
+Intelligently detects OS environment, locates claude and agy binaries,
+and automatically configures ~/.claude.json and agy mcp_config.json.
 """
 
 import os
 import sys
 import json
 import shutil
+import platform
 import subprocess
 import threading
 from typing import Dict, Any, Optional, Tuple
 
+
 class CLIRunner:
     def __init__(self):
         self.addon_dir = os.path.dirname(os.path.abspath(__file__))
-        self.bridge_path = os.path.join(self.addon_dir, "mcp_bridge.py")
+        self.bridge_path = os.path.join(self.addon_dir, "mcp_bridge.py").replace("\\", "/")
+
+    def detect_environment(self) -> Dict[str, Any]:
+        """
+        Detects current operating system, host environment (PC vs Termux),
+        and CLI binary paths.
+        """
+        sys_name = platform.system()
+        is_windows = (sys_name == "Windows")
+        is_termux = os.path.exists("/data/data/com.termux") or "TERMUX_VERSION" in os.environ
+        is_proot = False
+
+        if not is_windows:
+            try:
+                with open("/proc/version", "r", errors="ignore") as f:
+                    ver_text = f.read().lower()
+                    if "android" in ver_text or "proot" in ver_text:
+                        is_proot = True
+            except Exception:
+                pass
+
+        if is_windows:
+            env_name = "Windows PC"
+        elif is_termux:
+            env_name = "Android (Termux Native)"
+        elif is_proot:
+            env_name = "Android (Termux PRoot Linux)"
+        elif sys_name == "Darwin":
+            env_name = "macOS"
+        else:
+            env_name = f"Linux ({platform.release()})"
+
+        claude_bin = self.find_claude_cli()
+        agy_bin = self.find_agy_cli()
+
+        return {
+            "os_name": env_name,
+            "system": sys_name,
+            "is_windows": is_windows,
+            "is_termux": is_termux or is_proot,
+            "claude_bin": claude_bin,
+            "agy_bin": agy_bin,
+            "claude_detected": claude_bin is not None,
+            "agy_detected": agy_bin is not None,
+            "python_executable": self.get_python_executable()
+        }
+
+    def get_python_executable(self) -> str:
+        """Returns clean path or command for python interpreter."""
+        if platform.system() == "Windows":
+            # Blender bundled python or system python
+            if sys.executable and os.path.exists(sys.executable):
+                return sys.executable.replace("\\", "/")
+            return "python"
+        else:
+            if sys.executable and os.path.exists(sys.executable):
+                return sys.executable
+            return "python3"
 
     def find_claude_cli(self) -> Optional[str]:
-        """Locates the 'claude' CLI binary in PATH or Termux paths."""
-        found = shutil.which("claude")
-        if found:
-            return found
-        
-        # Check Termux / Linux common paths
-        termux_paths = [
-            "/data/data/com.termux/files/usr/bin/claude",
-            os.path.expanduser("~/.npm-global/bin/claude"),
-            os.path.expanduser("~/.nvm/versions/node/default/bin/claude"),
-            "/usr/local/bin/claude",
-            "/usr/bin/claude"
-        ]
-        for p in termux_paths:
-            if os.path.exists(p) and os.access(p, os.X_OK):
-                return p
+        """Locates 'claude' CLI binary across Windows and Linux/Termux."""
+        # 1. Search PATH with extensions
+        for ext in (["", ".exe", ".cmd", ".bat"] if platform.system() == "Windows" else [""]):
+            found = shutil.which("claude" + ext)
+            if found:
+                return found.replace("\\", "/")
+
+        home = os.path.expanduser("~")
+        candidates = []
+
+        if platform.system() == "Windows":
+            # Windows Candidates
+            appdata = os.environ.get("APPDATA", "")
+            localappdata = os.environ.get("LOCALAPPDATA", "")
+            userprofile = os.environ.get("USERPROFILE", home)
+
+            candidates.extend([
+                os.path.join(userprofile, ".local", "bin", "claude.exe"),
+                os.path.join(userprofile, ".local", "bin", "claude.cmd"),
+                os.path.join(appdata, "npm", "claude.cmd"),
+                os.path.join(localappdata, "npm", "claude.cmd"),
+                os.path.join(localappdata, "Programs", "claude", "claude.exe"),
+            ])
+        else:
+            # Termux & Linux Candidates
+            candidates.extend([
+                "/data/data/com.termux/files/usr/bin/claude",
+                os.path.join(home, ".local", "bin", "claude"),
+                os.path.join(home, ".npm-global", "bin", "claude"),
+                os.path.join(home, ".nvm", "versions", "node", "default", "bin", "claude"),
+                "/usr/local/bin/claude",
+                "/usr/bin/claude"
+            ])
+
+        for c in candidates:
+            if c and os.path.exists(c):
+                return c.replace("\\", "/")
+
         return None
 
     def find_agy_cli(self) -> Optional[str]:
-        """Locates the 'agy' CLI binary in PATH or Termux paths."""
-        found = shutil.which("agy")
-        if found:
-            return found
-        termux_paths = [
-            "/data/data/com.termux/files/usr/bin/agy",
-            os.path.expanduser("~/.local/bin/agy"),
-            "/usr/local/bin/agy",
-            "/usr/bin/agy"
-        ]
-        for p in termux_paths:
-            if os.path.exists(p) and os.access(p, os.X_OK):
-                return p
+        """Locates 'agy' CLI binary across Windows and Linux/Termux."""
+        for ext in (["", ".exe", ".cmd", ".bat"] if platform.system() == "Windows" else [""]):
+            found = shutil.which("agy" + ext)
+            if found:
+                return found.replace("\\", "/")
+
+        home = os.path.expanduser("~")
+        candidates = []
+
+        if platform.system() == "Windows":
+            localappdata = os.environ.get("LOCALAPPDATA", "")
+            userprofile = os.environ.get("USERPROFILE", home)
+            candidates.extend([
+                os.path.join(localappdata, "agy", "bin", "agy.exe"),
+                os.path.join(localappdata, "Programs", "agy", "bin", "agy.exe"),
+                os.path.join(userprofile, ".local", "bin", "agy.exe"),
+                os.path.join(userprofile, ".local", "bin", "agy.cmd"),
+            ])
+        else:
+            candidates.extend([
+                "/data/data/com.termux/files/usr/bin/agy",
+                os.path.join(home, ".local", "bin", "agy"),
+                "/usr/local/bin/agy",
+                "/usr/bin/agy"
+            ])
+
+        for c in candidates:
+            if c and os.path.exists(c):
+                return c.replace("\\", "/")
+
         return None
 
     def configure_claude_code_mcp(self) -> Tuple[bool, str]:
         """
         Auto-configures ~/.claude.json so Claude Code knows about the Blender MCP server.
+        Works seamlessly on Windows, Linux, and Termux.
         """
         home = os.path.expanduser("~")
         claude_config_path = os.path.join(home, ".claude.json")
@@ -64,28 +163,31 @@ class CLIRunner:
             try:
                 with open(claude_config_path, "r", encoding="utf-8") as f:
                     config = json.load(f)
-            except Exception as e:
+            except Exception:
                 config = {}
 
         if "mcpServers" not in config:
             config["mcpServers"] = {}
 
-        # Add or update blender MCP configuration
+        python_cmd = self.get_python_executable()
+
+        # Write clean forward-slash arguments to avoid escape issues on Windows
         config["mcpServers"]["blender"] = {
-            "command": sys.executable if sys.executable else "python3",
+            "command": python_cmd,
             "args": [self.bridge_path]
         }
 
         try:
             with open(claude_config_path, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2, ensure_ascii=False)
-            return True, f"Successfully registered Blender MCP in {claude_config_path}"
+            return True, f"Blender MCP configured in {claude_config_path}"
         except Exception as e:
             return False, f"Failed to write ~/.claude.json: {str(e)}"
 
     def configure_agy_cli_mcp(self) -> Tuple[bool, str]:
         """
         Auto-configures agy MCP configuration in ~/.gemini/config/mcp_config.json.
+        Works seamlessly on Windows, Linux, and Termux.
         """
         home = os.path.expanduser("~")
         agy_dir = os.path.join(home, ".gemini", "config")
@@ -103,21 +205,26 @@ class CLIRunner:
         if "mcpServers" not in config:
             config["mcpServers"] = {}
 
+        python_cmd = self.get_python_executable()
+
+        # agy supports command/args stdio or serverUrl
         config["mcpServers"]["blender"] = {
-            "command": sys.executable if sys.executable else "python3",
-            "args": [self.bridge_path]
+            "command": python_cmd,
+            "args": [self.bridge_path],
+            "serverUrl": "http://127.0.0.1:8000/mcp"
         }
 
         try:
             with open(agy_config_path, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2, ensure_ascii=False)
-            return True, f"Successfully registered Blender MCP in {agy_config_path}"
+            return True, f"Blender MCP configured in {agy_config_path}"
         except Exception as e:
             return False, f"Failed to write agy mcp_config.json: {str(e)}"
 
     def run_cli_command_async(self, cli_type: str, prompt: str, on_complete=None):
         """
-        Executes claude or agy with the given prompt in a background thread.
+        Executes claude or agy with the given prompt in a background thread,
+        handling Windows cmd extensions and shell execution properly.
         """
         def _target():
             bin_path = self.find_claude_cli() if cli_type == "claude" else self.find_agy_cli()
@@ -125,17 +232,23 @@ class CLIRunner:
 
             if not bin_path:
                 if on_complete:
-                    on_complete(False, f"{cmd_name} CLI binary not found in PATH or Termux.")
+                    on_complete(False, f"{cmd_name} CLI binary not found in system or Termux.")
                 return
 
             try:
-                # Run CLI with non-interactive prompt flag
+                is_win = (platform.system() == "Windows")
+                use_shell = is_win and bin_path.lower().endswith((".cmd", ".bat"))
+
                 cmd = [bin_path, "-p", prompt]
+
                 proc = subprocess.Popen(
                     cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    text=True
+                    text=True,
+                    shell=use_shell,
+                    encoding="utf-8",
+                    errors="replace"
                 )
                 stdout, stderr = proc.communicate(timeout=180)
                 output = stdout or stderr or f"Executed {cmd_name}."

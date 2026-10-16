@@ -18,6 +18,7 @@ from session_manager import session_mgr
 from llm_client import LLMClient
 from mcp_handler import mcp_handler
 from task_queue import task_queue
+from cli_runner import cli_runner
 
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
@@ -122,6 +123,11 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
                 "status": status,
                 "tasks": tasks
             })
+            return
+
+        elif path == "/api/environment":
+            env = cli_runner.detect_environment()
+            self._send_json(200, env)
             return
 
         # 3. MCP SSE Endpoint (for SSE-compatible MCP clients)

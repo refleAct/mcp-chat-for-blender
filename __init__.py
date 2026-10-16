@@ -490,19 +490,27 @@ class MCPCHAT_PT_cli_panel(Panel):
     def draw(self, context):
         layout = self.layout
 
-        claude_path = cli_runner.find_claude_cli()
-        agy_path = cli_runner.find_agy_cli()
+        env = cli_runner.detect_environment()
+        os_name = env["os_name"]
+        claude_path = env["claude_bin"]
+        agy_path = env["agy_bin"]
 
+        # Environment Auto-Detection Box
+        box_env = layout.box()
+        env_icon = 'DESKTOP' if env["is_windows"] else ('COMMUNITY' if env["is_termux"] else 'HELP')
+        box_env.label(text=f"환경 감지: {os_name}", icon=env_icon)
+
+        # CLI Detection Status Box
         box = layout.box()
-        # Claude Status
         if claude_path:
-            box.label(text="Claude Code: 감지됨", icon='CHECKMARK')
+            short_name = os.path.basename(claude_path)
+            box.label(text=f"Claude Code: 감지됨 ({short_name})", icon='CHECKMARK')
         else:
             box.label(text="Claude Code: 미감지 (npm i -g @anthropic-ai/claude-code)", icon='X')
 
-        # agy Status
         if agy_path:
-            box.label(text="agy CLI: 감지됨", icon='CHECKMARK')
+            short_name = os.path.basename(agy_path)
+            box.label(text=f"agy CLI: 감지됨 ({short_name})", icon='CHECKMARK')
         else:
             box.label(text="agy CLI: 미감지", icon='X')
 
