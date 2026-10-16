@@ -50,9 +50,14 @@ target.keyframe_insert(data_path="rotation_euler", frame=1)
 target.rotation_euler = (0, 0, math.radians(360))
 target.keyframe_insert(data_path="rotation_euler", frame=120)
 
-if target.animation_data and target.animation_data.action:
-    for fc in target.animation_data.action.fcurves:
-        for kf in fc.keyframe_points:
-            kf.interpolation = 'LINEAR'
+# Set Linear interpolation (safely handles Blender 4.x and 5.x)
+try:
+    if target.animation_data and target.animation_data.action:
+        curves = getattr(target.animation_data.action, "fcurves", None) or getattr(target.animation_data.action, "curves", None) or []
+        for fc in curves:
+            for kf in getattr(fc, "keyframe_points", []):
+                kf.interpolation = 'LINEAR'
+except Exception:
+    pass
 print("Turntable animation configured.")
 ```

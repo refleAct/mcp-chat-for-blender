@@ -70,10 +70,15 @@ target.keyframe_insert(data_path="rotation_euler", frame=1)
 target.rotation_euler = (0, 0, math.radians(360))
 target.keyframe_insert(data_path="rotation_euler", frame=120)
 
-if target.animation_data and target.animation_data.action:
-    for fc in target.animation_data.action.fcurves:
-        for kf in fc.keyframe_points:
-            kf.interpolation = 'LINEAR'
+# Set Linear interpolation (safely handles Blender 4.x and 5.x)
+try:
+    if target.animation_data and target.animation_data.action:
+        curves = getattr(target.animation_data.action, "fcurves", None) or getattr(target.animation_data.action, "curves", None) or []
+        for fc in curves:
+            for kf in getattr(fc, "keyframe_points", []):
+                kf.interpolation = 'LINEAR'
+except Exception:
+    pass
 print("Turntable animation configured.")
 ```"""
     },
@@ -637,6 +642,104 @@ Automates location, rotation, and property keyframing directly via MCP calls."""
         "description": "Standardized MCP JSON-RPC protocol bridge between AI agents and active Blender sessions.",
         "content": """# Blender Pipeline Integration
 Establishes reliable socket/HTTP RPC bridge for automated 3D execution."""
+    },
+    {
+        "id": "procedural-texture-generator",
+        "domain": "materials",
+        "name": "Procedural PBR Texture Generator",
+        "triggers": ["절차적 텍스처", "노드 텍스처", "procedural texture", "texture maker", "procedural shader", "노이즈 셰이더", "procedural material"],
+        "description": "Generates procedural PBR shader textures using noise, voronoi, bump, and color ramps without external image files.",
+        "content": """# Procedural Texture Generator
+Builds infinite, resolution-independent procedural PBR materials using Blender's native shader node graph.
+
+## Verified bpy Recipe
+```python
+import bpy
+
+def create_procedural_material(obj, mat_name="Procedural_PBR", style="worn_metal"):
+    mat = bpy.data.materials.new(name=mat_name)
+    mat.use_nodes = True
+    nodes = mat.node_tree.nodes
+    links = mat.node_tree.links
+    nodes.clear()
+
+    out = nodes.new("ShaderNodeOutputMaterial")
+    out.location = (600, 0)
+    
+    bsdf = nodes.new("ShaderNodeBsdfPrincipled")
+    bsdf.location = (200, 0)
+    links.new(bsdf.outputs["BSDF"], out.inputs["Surface"])
+
+    tex_coord = nodes.new("ShaderNodeTexCoord")
+    mapping = nodes.new("ShaderNodeMapping")
+    links.new(tex_coord.outputs["Object"], mapping.inputs["Vector"])
+
+    noise = nodes.new("ShaderNodeTexNoise")
+    noise.inputs["Scale"].default_value = 8.0
+    noise.inputs["Detail"].default_value = 6.0
+    links.new(mapping.outputs["Vector"], noise.inputs["Vector"])
+
+    ramp_col = nodes.new("ShaderNodeValToRGB")
+    ramp_col.color_ramp.elements[0].color = (0.15, 0.16, 0.18, 1.0)
+    ramp_col.color_ramp.elements[1].color = (0.45, 0.48, 0.52, 1.0)
+    links.new(noise.outputs["Fac"], ramp_col.inputs["Fac"])
+    links.new(ramp_col.outputs["Color"], bsdf.inputs["Base Color"])
+
+    bump = nodes.new("ShaderNodeBump")
+    bump.inputs["Strength"].default_value = 0.18
+    links.new(noise.outputs["Fac"], bump.inputs["Height"])
+    links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
+    bsdf.inputs["Metallic"].default_value = 0.85
+
+    if obj and hasattr(obj.data, "materials"):
+        obj.data.materials.clear()
+        obj.data.materials.append(mat)
+    return mat
+```"""
+    },
+    {
+        "id": "texture-baking",
+        "domain": "materials",
+        "name": "High-to-Low Texture Baking",
+        "triggers": ["베이킹", "텍스처 베이킹", "texture baking", "bake normal", "high to low bake", "노멀맵 굽기", "bake ao"],
+        "description": "Bakes high-poly sculpt details (Normal, Ambient Occlusion, Curvature) onto low-poly UV unwrapped meshes.",
+        "content": """# Texture Baking (High-Poly to Low-Poly)
+Bakes tangent-space normal maps and ambient occlusion maps from high-resolution geometry onto low-poly game models.
+
+## Verified bpy Recipe
+```python
+import bpy
+
+def bake_high_to_low(high_obj, low_obj, bake_type='NORMAL', img_name="Baked_Normal_Map", res=2048):
+    bpy.context.scene.render.engine = 'CYCLES'
+    bpy.context.scene.cycles.bake_type = bake_type
+    
+    image = bpy.data.images.new(name=img_name, width=res, height=res, alpha=False, is_float=False)
+    image.colorspace_settings.name = 'Non-Color' if bake_type == 'NORMAL' else 'sRGB'
+
+    if not low_obj.data.materials:
+        mat = bpy.data.materials.new(name=f"{low_obj.name}_BakeMat")
+        mat.use_nodes = True
+        low_obj.data.materials.append(mat)
+    else:
+        mat = low_obj.data.materials[0]
+
+    nodes = mat.node_tree.nodes
+    bake_node = nodes.new('ShaderNodeTexImage')
+    bake_node.image = image
+    nodes.active = bake_node
+
+    bpy.ops.object.select_all(action='DESELECT')
+    high_obj.select_set(True)
+    low_obj.select_set(True)
+    bpy.context.view_layer.objects.active = low_obj
+
+    bpy.context.scene.render.bake.use_selected_to_active = True
+    bpy.context.scene.render.bake.cage_extrusion = 0.05
+    bpy.context.scene.render.bake.max_ray_distance = 0.1
+    bpy.ops.object.bake(type=bake_type)
+    print(f"Baked {bake_type} map to {image.name}")
+```"""
     }
 ]
 

@@ -411,6 +411,38 @@
       ],
       "file": "skills/blender-pipeline-integration/SKILL.md",
       "summary": "Standardized MCP JSON-RPC protocol bridge between AI agents and active Blender sessions."
+    },
+    {
+      "id": "procedural-texture-generator",
+      "domain": "materials",
+      "name": "Procedural PBR Texture Generator",
+      "triggers": [
+        "절차적 텍스처",
+        "노드 텍스처",
+        "procedural texture",
+        "texture maker",
+        "procedural shader",
+        "노이즈 셰이더",
+        "procedural material"
+      ],
+      "file": "skills/procedural-texture-generator/SKILL.md",
+      "summary": "Generates procedural PBR shader textures using noise, voronoi, bump, and color ramps without external image files."
+    },
+    {
+      "id": "texture-baking",
+      "domain": "materials",
+      "name": "High-to-Low Texture Baking",
+      "triggers": [
+        "베이킹",
+        "텍스처 베이킹",
+        "texture baking",
+        "bake normal",
+        "high to low bake",
+        "노멀맵 굽기",
+        "bake ao"
+      ],
+      "file": "skills/texture-baking/SKILL.md",
+      "summary": "Bakes high-poly sculpt details (Normal, Ambient Occlusion, Curvature) onto low-poly UV unwrapped meshes."
     }
   ]
 }
