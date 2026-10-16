@@ -317,20 +317,20 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
             if active_provider == "openrouter":
                 api_key = settings.get("openrouter_api_key", "")
                 if not model_name:
-                    model_name = settings.get("openrouter_model", "anthropic/claude-3.5-sonnet")
+                    model_name = settings.get("openrouter_model") or "anthropic/claude-3.5-sonnet"
             elif active_provider == "nvidia_nim":
                 api_key = settings.get("nvidia_nim_api_key", "")
                 if not model_name:
-                    model_name = settings.get("nvidia_nim_model", "meta/llama-3.3-70b-instruct")
+                    model_name = settings.get("nvidia_nim_model") or "meta/llama-3.3-70b-instruct"
             elif active_provider == "local":
-                base_url = settings.get("local_base_url", "http://127.0.0.1:11434/v1")
+                base_url = settings.get("local_base_url") or "http://127.0.0.1:11434/v1"
                 if not model_name:
-                    model_name = settings.get("local_model", "qwen2.5-coder:latest")
+                    model_name = settings.get("local_model") or "qwen2.5-coder:latest"
             else: # custom
                 api_key = settings.get("custom_api_key", "")
                 base_url = settings.get("custom_base_url", "")
                 if not model_name:
-                    model_name = settings.get("custom_model", "gpt-4o")
+                    model_name = settings.get("custom_model") or "gpt-4o"
 
             provider_config = {
                 "provider": active_provider,

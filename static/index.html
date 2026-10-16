@@ -192,7 +192,7 @@
           <!-- OpenRouter Form -->
           <div class="provider-form" id="form-openrouter">
             <div class="form-group">
-              <label for="cfg-openrouter-key">OpenRouter API Key</label>
+              <label for="cfg-openrouter-key">OpenRouter API Key <span class="form-hint">(선택)</span></label>
               <input type="password" id="cfg-openrouter-key" placeholder="sk-or-v1-..." class="form-input">
             </div>
             <div class="form-group">
@@ -205,7 +205,7 @@
           <!-- NVIDIA NIM Form -->
           <div class="provider-form" id="form-nvidia_nim" hidden>
             <div class="form-group">
-              <label for="cfg-nvidia-key">NVIDIA NIM API Key</label>
+              <label for="cfg-nvidia-key">NVIDIA NIM API Key <span class="form-hint">(선택)</span></label>
               <input type="password" id="cfg-nvidia-key" placeholder="nvapi-..." class="form-input">
             </div>
             <div class="form-group">
@@ -231,15 +231,15 @@
           <!-- Custom OpenAI-compatible Form -->
           <div class="provider-form" id="form-custom" hidden>
             <div class="form-group">
-              <label for="cfg-custom-url">Endpoint Base URL</label>
+              <label for="cfg-custom-url">Endpoint Base URL <span class="form-hint">(선택 · 비우면 기본값)</span></label>
               <input type="text" id="cfg-custom-url" placeholder="https://api.openai.com/v1" class="form-input">
             </div>
             <div class="form-group">
-              <label for="cfg-custom-key">API Key</label>
+              <label for="cfg-custom-key">API Key <span class="form-hint">(선택)</span></label>
               <input type="password" id="cfg-custom-key" class="form-input">
             </div>
             <div class="form-group">
-              <label for="cfg-custom-model">Model Name</label>
+              <label for="cfg-custom-model">Model Name <span class="form-hint">(선택 · 비우면 gpt-4o)</span></label>
               <input type="text" id="cfg-custom-model" placeholder="gpt-4o" class="form-input">
             </div>
           </div>
