@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Blender MCP AI Assistant</title>
+  <meta name="description" content="Android & Termux optimized Blender AI Chat Assistant with MCP, Multi-session, Vision, and Reasoning controls.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Left Navigation / Session Drawer -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-box">
+          <div class="logo-icon">🧊</div>
+          <div class="logo-text">
+            <h2>Blender MCP</h2>
+            <span class="badge-status online" id="server-status-pill">Connected</span>
+          </div>
+        </div>
+        <button class="icon-btn close-sidebar-btn" id="close-sidebar-btn" aria-label="사이드바 닫기">✕</button>
+      </div>
+
+      <div class="sidebar-actions">
+        <button class="primary-btn new-chat-btn" id="new-chat-btn">
+          <span class="btn-icon">＋</span>
+          <span>새 채팅 세션</span>
+        </button>
+      </div>
+
+      <div class="sessions-list-container">
+        <div class="session-section-title">최근 대화 세션</div>
+        <div class="sessions-list" id="sessions-list">
+          <!-- Dynamic session items will be rendered here -->
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="secondary-btn settings-btn" id="open-settings-btn">
+          <span class="btn-icon">⚙️</span>
+          <span>모델 & AI 설정</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Sidebar Backdrop for Mobile Touch -->
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <!-- Main Chat View -->
+    <main class="chat-main">
+      <!-- Top Navigation Header -->
+      <header class="chat-header">
+        <div class="header-left">
+          <button class="icon-btn menu-btn" id="toggle-sidebar-btn" aria-label="메뉴 열기">
+            <span class="hamburger-bar"></span>
+            <span class="hamburger-bar"></span>
+            <span class="hamburger-bar"></span>
+          </button>
+          <div class="active-session-info">
+            <h1 class="session-title" id="current-session-title">Blender AI Assistant</h1>
+            <div class="session-meta">
+              <span class="model-badge" id="current-model-badge">claude-3.5-sonnet</span>
+              <span class="reasoning-badge" id="current-reasoning-badge">Reasoning: Med</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <button class="ghost-btn tool-btn" id="btn-quick-viewport" title="블렌더 화면 캡처">
+            <span class="btn-icon">📸</span>
+            <span class="btn-text">뷰포트 캡처</span>
+          </button>
+          <button class="ghost-btn tool-btn" id="btn-quick-scene" title="현재 씬 정보 조회">
+            <span class="btn-icon">🔍</span>
+            <span class="btn-text">씬 정보</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Message History Container -->
+      <section class="messages-container" id="messages-container">
+        <!-- Dynamic chat messages inserted here -->
+        <div class="welcome-card" id="welcome-card">
+          <div class="welcome-icon">🎨</div>
+          <h2>안드로이드 블렌더 AI 어시스턴트</h2>
+          <p>프롬프트를 입력하면 AI가 직접 파이썬 스크립트를 작성하여 블렌더 3D 씬을 생성하고 조작합니다.</p>
+          
+          <div class="quick-prompts-grid">
+            <button class="quick-chip" data-prompt="간단한 사이버펑크 네온 큐브와 조명 세트를 만들어줘">
+              🏙️ 사이버펑크 네온 큐브 생성
+            </button>
+            <button class="quick-chip" data-prompt="현재 씬의 모든 오브젝트 목록과 재질 정보를 분석해줘">
+              📊 씬 분석 및 요약
+            </button>
+            <button class="quick-chip" data-prompt="저폴리곤(Low-poly) 소나무와 지형을 바닥에 생성해줘">
+              🌲 저폴리곤 숲 지형 생성
+            </button>
+            <button class="quick-chip" data-prompt="현재 뷰포트 화면을 캡처해서 구도를 평가해줘">
+              📸 뷰포트 캡처 및 구도 평가
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Input Footer Area -->
+      <footer class="chat-input-area">
+        <!-- Attached Images Thumbnail Preview Bar -->
+        <div class="attachment-preview-bar" id="attachment-preview-bar"></div>
+
+        <!-- Input Box -->
+        <div class="input-card">
+          <div class="input-actions-left">
+            <label class="action-circle-btn file-upload-label" title="이미지/사진 첨부">
+              <input type="file" id="image-file-input" accept="image/*" multiple hidden>
+              <span>📷</span>
+            </label>
+            <button class="action-circle-btn" id="btn-attach-viewport" title="현재 3D 뷰포트 캡처 후 첨부">
+              <span>🖼️</span>
+            </button>
+          </div>
+
+          <textarea 
+            id="chat-textarea" 
+            class="chat-textarea" 
+            placeholder="블렌더에 요청할 작업을 입력하세요... (예: 크롬 구체와 붉은 조명 추가)" 
+            rows="1"
+          ></textarea>
+
+          <button class="send-btn" id="send-btn" aria-label="메시지 전송">
+            <svg viewBox="0 0 24 24" fill="none" class="send-icon">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="currentColor"/>
+            </svg>
+          </button>
+        </div>
+        <div class="input-hint">
+          <span>💡 모바일 카메라/갤러리 사진 첨부 가능 · Termux Claude Code / agy CLI (MCP) 연동 지원</span>
+        </div>
+      </footer>
+    </main>
+
+    <!-- Settings Modal -->
+    <div class="modal-backdrop" id="settings-modal" hidden>
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>AI 모델 및 엔드포인트 설정</h3>
+          <button class="icon-btn modal-close-btn" id="close-settings-btn">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Provider Tabs -->
+          <div class="provider-tabs">
+            <button class="tab-btn active" data-provider="openrouter">OpenRouter</button>
+            <button class="tab-btn" data-provider="nvidia_nim">NVIDIA NIM</button>
+            <button class="tab-btn" data-provider="local">Local (Ollama)</button>
+            <button class="tab-btn" data-provider="custom">Custom (OpenAI)</button>
+          </div>
+
+          <!-- OpenRouter Form -->
+          <div class="provider-form" id="form-openrouter">
+            <div class="form-group">
+              <label for="cfg-openrouter-key">OpenRouter API Key</label>
+              <input type="password" id="cfg-openrouter-key" placeholder="sk-or-v1-..." class="form-input">
+            </div>
+            <div class="form-group">
+              <label for="cfg-openrouter-model">Model Name</label>
+              <input type="text" id="cfg-openrouter-model" value="anthropic/claude-3.5-sonnet" class="form-input">
+              <span class="form-help">추천: anthropic/claude-3.5-sonnet, openai/gpt-4o, deepseek/deepseek-r1</span>
+            </div>
+          </div>
+
+          <!-- NVIDIA NIM Form -->
+          <div class="provider-form" id="form-nvidia_nim" hidden>
+            <div class="form-group">
+              <label for="cfg-nvidia-key">NVIDIA NIM API Key</label>
+              <input type="password" id="cfg-nvidia-key" placeholder="nvapi-..." class="form-input">
+            </div>
+            <div class="form-group">
+              <label for="cfg-nvidia-model">Model Name</label>
+              <input type="text" id="cfg-nvidia-model" value="meta/llama-3.3-70b-instruct" class="form-input">
+              <span class="form-help">추천: meta/llama-3.3-70b-instruct, nvidia/llama-3.1-nemotron-70b-instruct</span>
+            </div>
+          </div>
+
+          <!-- Local LLM Form (Ollama / vLLM / LM Studio) -->
+          <div class="provider-form" id="form-local" hidden>
+            <div class="form-group">
+              <label for="cfg-local-url">Local Base URL</label>
+              <input type="text" id="cfg-local-url" value="http://127.0.0.1:11434/v1" class="form-input">
+              <span class="form-help">Termux 내부 또는 동일 Wi-Fi의 Ollama, LM Studio, vLLM 주소</span>
+            </div>
+            <div class="form-group">
+              <label for="cfg-local-model">Local Model</label>
+              <input type="text" id="cfg-local-model" value="qwen2.5-coder:latest" class="form-input">
+            </div>
+          </div>
+
+          <!-- Custom OpenAI-compatible Form -->
+          <div class="provider-form" id="form-custom" hidden>
+            <div class="form-group">
+              <label for="cfg-custom-url">Endpoint Base URL</label>
+              <input type="text" id="cfg-custom-url" placeholder="https://api.openai.com/v1" class="form-input">
+            </div>
+            <div class="form-group">
+              <label for="cfg-custom-key">API Key</label>
+              <input type="password" id="cfg-custom-key" class="form-input">
+            </div>
+            <div class="form-group">
+              <label for="cfg-custom-model">Model Name</label>
+              <input type="text" id="cfg-custom-model" placeholder="gpt-4o" class="form-input">
+            </div>
+          </div>
+
+          <hr class="divider">
+
+          <!-- Reasoning & Inference Performance Settings -->
+          <div class="form-row">
+            <div class="form-group half">
+              <label for="cfg-reasoning-effort">추론 강도 (Reasoning)</label>
+              <select id="cfg-reasoning-effort" class="form-select">
+                <option value="none">사용 안 함 (기본)</option>
+                <option value="low">Low (빠른 추론)</option>
+                <option value="medium" selected>Medium (균형)</option>
+                <option value="high">High (심층 추론)</option>
+              </select>
+              <span class="form-help">o1, o3-mini, DeepSeek R1 등에 적용</span>
+            </div>
+
+            <div class="form-group half">
+              <label for="cfg-thinking-budget">Claude Thinking 토큰</label>
+              <input type="number" id="cfg-thinking-budget" value="2048" step="1024" min="0" max="64000" class="form-input">
+              <span class="form-help">Claude 3.7 Sonnet 확장 사고 예산</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="cfg-temperature">Temperature (창의성)</label>
+            <div class="range-box">
+              <input type="range" id="cfg-temperature" min="0.0" max="1.5" step="0.1" value="0.7">
+              <span id="cfg-temperature-val">0.7</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="cfg-port">서버 포트</label>
+            <input type="number" id="cfg-port" value="8000" class="form-input">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="secondary-btn" id="cancel-settings-btn">취소</button>
+          <button class="primary-btn" id="save-settings-btn">설정 저장</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
