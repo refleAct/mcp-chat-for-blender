@@ -66,6 +66,28 @@ BLENDER_TOOLS = [
                 }
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "lookup_blender_skill",
+            "description": "Lookup specialized Blender standard workflows, recipes, and verified bpy code snippets for cameras, lighting, materials, hard surface, rigging, physics, or game engine export.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Keywords or intent describing the desired Blender workflow or recipe (e.g. 'turntable', 'unreal export', 'boolean cut', 'studio lighting')."
+                    },
+                    "domain": {
+                        "type": "string",
+                        "enum": ["environment", "character", "hard_surface", "materials", "rigging", "animation", "physics", "vfx", "camera_lighting", "pipeline_gamedev"],
+                        "description": "Optional category/domain filter."
+                    }
+                },
+                "required": ["query"]
+            }
+        }
     }
 ]
 
@@ -103,8 +125,18 @@ def compose_plan_messages(user_prompt: str, images=None):
     if imgs:
         user_content = [{"type": "text", "text": text + " (Use the attached images as reference when planning.)"}]
         user_content += [{"type": "image_url", "image_url": {"url": u}} for u in imgs]
+
+    plan_sys = build_plan_system()
+    try:
+        from skill_manager import skill_mgr
+        sb = skill_mgr.build_injection_prompt(user_prompt)
+        if sb:
+            plan_sys = (plan_sys + "\n" + sb).strip()
+    except Exception:
+        pass
+
     return [
-        {"role": "system", "content": build_plan_system()},
+        {"role": "system", "content": plan_sys},
         {"role": "user", "content": user_content}
     ]
 
@@ -184,8 +216,26 @@ class LLMClient:
     def format_history_for_api(self, system_prompt: str, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Formats stored database messages into OpenAI multimodal chat format."""
         api_messages = []
-        if system_prompt:
-            api_messages.append({"role": "system", "content": system_prompt})
+
+        # Dynamic Skill Injection based on last user request
+        augmented_system = system_prompt or ""
+        last_user_prompt = ""
+        for m in reversed(messages):
+            if m.get("role") == "user":
+                last_user_prompt = m.get("content") or ""
+                break
+
+        if last_user_prompt and isinstance(last_user_prompt, str):
+            try:
+                from skill_manager import skill_mgr
+                skill_block = skill_mgr.build_injection_prompt(last_user_prompt)
+                if skill_block:
+                    augmented_system = (augmented_system + "\n" + skill_block).strip()
+            except Exception:
+                pass
+
+        if augmented_system:
+            api_messages.append({"role": "system", "content": augmented_system})
 
         for msg in messages:
             role = msg["role"]
@@ -240,6 +290,14 @@ class LLMClient:
                     "image_base64": res["image_base64"]
                 }
             return res
+        elif tool_name == "lookup_blender_skill":
+            try:
+                from skill_manager import skill_mgr
+                q = arguments.get("query", "")
+                dom = arguments.get("domain")
+                return skill_mgr.tool_lookup(query=q, domain=dom)
+            except Exception as e:
+                return {"error": f"Failed looking up skill: {str(e)}"}
         else:
             return {"error": f"Unknown tool name: {tool_name}"}
 

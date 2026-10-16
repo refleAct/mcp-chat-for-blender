@@ -27,10 +27,12 @@ INCLUDE_FILES = [
     "server.py",
     "session_manager.py",
     "task_queue.py",
+    "skill_manager.py",
+    "plugin_manager.py",
     "README.md",
     "install_termux.sh",
 ]
-INCLUDE_DIRS = ["static"]
+INCLUDE_DIRS = ["static", "skills"]
 
 def package_ci(out_dir="dist"):
     """CI build: dist/mcp-chat-for-blender-vX.Y.Z.zip only (no local Blender or deploy-folder copies)."""

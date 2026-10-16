@@ -383,6 +383,15 @@ class CLIRunner:
             nl0 = chr(10)
             prompt = (prompt + nl0 + nl0 + "[Attached images - open and study them before starting, and use them as reference]" + nl0
                       + nl0.join("- " + p for p in image_paths))
+
+        try:
+            from skill_manager import skill_mgr
+            sb = skill_mgr.build_injection_prompt(prompt)
+            if sb:
+                guidelines = (guidelines + "\n" + sb).strip() + "\n\n"
+        except Exception:
+            pass
+
         plan_text = (
             guidelines
             + "PLAN MODE: Provide a structured step-by-step 3D modeling plan for Blender for: "

@@ -76,6 +76,25 @@ MCP_TOOLS = [
             "type": "object",
             "properties": {}
         }
+    },
+    {
+        "name": "lookup_blender_skill",
+        "description": "Lookup specialized Blender standard workflows, recipes, and verified bpy code snippets for cameras, lighting, materials, hard surface, rigging, physics, or game engine export.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Keywords or intent describing the desired Blender workflow or recipe (e.g. 'turntable', 'unreal export', 'boolean cut', 'studio lighting')."
+                },
+                "domain": {
+                    "type": "string",
+                    "enum": ["environment", "character", "hard_surface", "materials", "rigging", "animation", "physics", "vfx", "camera_lighting", "pipeline_gamedev"],
+                    "description": "Optional category/domain filter."
+                }
+            },
+            "required": ["query"]
+        }
     }
 ]
 
@@ -267,6 +286,32 @@ class MCPHandler:
                 ],
                 "isError": False
             }
+
+        elif name == "lookup_blender_skill":
+            try:
+                from skill_manager import skill_mgr
+                q = args.get("query", "")
+                dom = args.get("domain")
+                res = skill_mgr.tool_lookup(query=q, domain=dom)
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": json.dumps(res, indent=2, ensure_ascii=False)
+                        }
+                    ],
+                    "isError": res.get("status") == "not_found"
+                }
+            except Exception as e:
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"Error querying skills: {str(e)}"
+                        }
+                    ],
+                    "isError": True
+                }
 
         else:
             return {

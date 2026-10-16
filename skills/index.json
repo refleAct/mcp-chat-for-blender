@@ -1,0 +1,416 @@
+{
+  "version": "1.0",
+  "domains": [
+    {
+      "id": "environment",
+      "name": "Environment & World Building"
+    },
+    {
+      "id": "character",
+      "name": "Character, Sculpting & Topology"
+    },
+    {
+      "id": "hard_surface",
+      "name": "Hard Surface, CAD & Props"
+    },
+    {
+      "id": "materials",
+      "name": "Materials, Shading & UV"
+    },
+    {
+      "id": "rigging",
+      "name": "Rigging & Skeletal Setup"
+    },
+    {
+      "id": "animation",
+      "name": "Animation, Motion & Cycles"
+    },
+    {
+      "id": "physics",
+      "name": "Physics & Dynamic Simulation"
+    },
+    {
+      "id": "vfx",
+      "name": "VFX, Particles & Geometry Nodes"
+    },
+    {
+      "id": "camera_lighting",
+      "name": "Camera, Lighting & Rendering"
+    },
+    {
+      "id": "pipeline_gamedev",
+      "name": "Game Pipeline, LOD & Optimization"
+    }
+  ],
+  "skills": [
+    {
+      "id": "turntable",
+      "domain": "camera_lighting",
+      "name": "Turntable Camera Animation",
+      "triggers": [
+        "턴테이블",
+        "turntable",
+        "360",
+        "카메라 회전",
+        "orbit",
+        "쇼케이스"
+      ],
+      "file": "skills/turntable/SKILL.md",
+      "summary": "360-degree turntable camera orbit around a 3D product or character. Classic showcase animation."
+    },
+    {
+      "id": "slow-zoom",
+      "domain": "camera_lighting",
+      "name": "Slow Zoom In Animation",
+      "triggers": [
+        "줌인",
+        "slow zoom",
+        "클로즈업",
+        "zoom in",
+        "reveal",
+        "초점"
+      ],
+      "file": "skills/slow-zoom/SKILL.md",
+      "summary": "Cinematic push-in toward a hero detail for dramatic product reveal."
+    },
+    {
+      "id": "dolly-rotate",
+      "domain": "camera_lighting",
+      "name": "Dolly Rotate Sweeping Shot",
+      "triggers": [
+        "돌리",
+        "dolly",
+        "dolly rotate",
+        "스위핑",
+        "회전 이동"
+      ],
+      "file": "skills/dolly-rotate/SKILL.md",
+      "summary": "Camera moves forward along a curved path while rotating around target."
+    },
+    {
+      "id": "crane-shot",
+      "domain": "camera_lighting",
+      "name": "Crane Shot Elevation Reveal",
+      "triggers": [
+        "크레인",
+        "crane",
+        "crane shot",
+        "상승 샷",
+        "앙각에서 조감"
+      ],
+      "file": "skills/crane-shot/SKILL.md",
+      "summary": "Low to high vertical camera reveal sweeping from base to top."
+    },
+    {
+      "id": "dynamic-full-loop",
+      "domain": "animation",
+      "name": "Dynamic Full Loop Animation",
+      "triggers": [
+        "다이내믹 루프",
+        "dynamic loop",
+        "whip transition",
+        "루프 회전"
+      ],
+      "file": "skills/dynamic-full-loop/SKILL.md",
+      "summary": "Speed-ramped loop showing all sides with fast transitions."
+    },
+    {
+      "id": "perfect-loop",
+      "domain": "animation",
+      "name": "Perfect Loop Seamless Cycle",
+      "triggers": [
+        "퍼펙트 루프",
+        "perfect loop",
+        "무한 루프",
+        "seamless cycle"
+      ],
+      "file": "skills/perfect-loop/SKILL.md",
+      "summary": "Mathematically seamless cyclical motion with matching start/end derivatives."
+    },
+    {
+      "id": "polyhaven-material-swap",
+      "domain": "materials",
+      "name": "PolyHaven & CC0 PBR Material Swap",
+      "triggers": [
+        "polyhaven",
+        "재질 교체",
+        "material swap",
+        "cc0 swap",
+        "pbr swap"
+      ],
+      "file": "skills/polyhaven-material-swap/SKILL.md",
+      "summary": "Automated replacement and testing of PBR texture surfaces."
+    },
+    {
+      "id": "blender-product-polish",
+      "domain": "materials",
+      "name": "Blender Product Polish & Studio",
+      "triggers": [
+        "제품 폴리싱",
+        "에셋 정리",
+        "product polish",
+        "studio setup",
+        "광택"
+      ],
+      "file": "skills/blender-product-polish/SKILL.md",
+      "summary": "Cleans raw AI-generated GLTF meshes and sets 4-point studio lighting."
+    },
+    {
+      "id": "blender-toolkit",
+      "domain": "hard_surface",
+      "name": "Blender Toolkit Mesh Primitives",
+      "triggers": [
+        "toolkit",
+        "프리미티브 생성",
+        "블렌더 툴킷",
+        "create cube",
+        "primitive"
+      ],
+      "file": "skills/blender-toolkit/SKILL.md",
+      "summary": "Core geometry creation, mesh primitives, and modifier utilities."
+    },
+    {
+      "id": "blender-superskill",
+      "domain": "hard_surface",
+      "name": "Blender SuperSkill Disciplined Modeling",
+      "triggers": [
+        "superskill",
+        "슈퍼스킬",
+        "정밀 모델링",
+        "접촉면 검증",
+        "interface audit",
+        "수치 조립"
+      ],
+      "file": "skills/blender-superskill/SKILL.md",
+      "summary": "Disciplined reference-first modeling with numerical contact verification and solid shading discipline."
+    },
+    {
+      "id": "blender-director",
+      "domain": "pipeline_gamedev",
+      "name": "Blender Director Pipeline Router",
+      "triggers": [
+        "디렉터",
+        "director",
+        "파이프라인 라우터",
+        "blender-director"
+      ],
+      "file": "skills/blender-director/SKILL.md",
+      "summary": "Analyzes complex 3D requests and routes automatically to specialized pipeline skills."
+    },
+    {
+      "id": "unreal-export",
+      "domain": "pipeline_gamedev",
+      "name": "Unreal Engine 5 FBX Export",
+      "triggers": [
+        "언리얼",
+        "UE5",
+        "UE4",
+        "언리얼 익스포트",
+        "unreal export",
+        "ue fbx"
+      ],
+      "file": "skills/unreal-export/SKILL.md",
+      "summary": "Unreal Engine specific FBX export with 0.01 scale, Z-Up, UCX collision, and LOD groups."
+    },
+    {
+      "id": "unity-export",
+      "domain": "pipeline_gamedev",
+      "name": "Unity Engine FBX & Prefab Export",
+      "triggers": [
+        "유니티",
+        "unity",
+        "유니티 익스포트",
+        "unity export"
+      ],
+      "file": "skills/unity-export/SKILL.md",
+      "summary": "Unity specific FBX export with -180 rotation compensation and Y-up coordinate."
+    },
+    {
+      "id": "godot-export",
+      "domain": "pipeline_gamedev",
+      "name": "Godot 4 GLTF/GLB Export",
+      "triggers": [
+        "고도",
+        "godot",
+        "고도 익스포트",
+        "godot export",
+        "glb"
+      ],
+      "file": "skills/godot-export/SKILL.md",
+      "summary": "Godot 4 GLTF/GLB export with embedded materials and CollisionShape hints."
+    },
+    {
+      "id": "collision-proxy",
+      "domain": "pipeline_gamedev",
+      "name": "Collision Proxy UCX Generator",
+      "triggers": [
+        "콜리전",
+        "collision",
+        "ucx",
+        "collision proxy",
+        "충돌체"
+      ],
+      "file": "skills/collision-proxy/SKILL.md",
+      "summary": "Generates simplified UCX_ convex hulls and bounding collision boxes."
+    },
+    {
+      "id": "lod-pipeline",
+      "domain": "pipeline_gamedev",
+      "name": "LOD Chain Pipeline",
+      "triggers": [
+        "LOD",
+        "lod",
+        "lod pipeline",
+        "레벨오브디테일",
+        "decimate lod"
+      ],
+      "file": "skills/lod-pipeline/SKILL.md",
+      "summary": "Automated LOD0 (100%), LOD1 (50%), LOD2 (25%), LOD3 (12%) decimation chain."
+    },
+    {
+      "id": "asset-optimization",
+      "domain": "pipeline_gamedev",
+      "name": "Asset Optimization & Sanitization",
+      "triggers": [
+        "에셋 최적화",
+        "asset optimization",
+        "최적화",
+        "메쉬 정리",
+        "apply transform"
+      ],
+      "file": "skills/asset-optimization/SKILL.md",
+      "summary": "Cleans orphan data, applies scale/rotation, checks polygon budgets, and fixes normal orientations."
+    },
+    {
+      "id": "retopology",
+      "domain": "character",
+      "name": "Retopology Workflow",
+      "triggers": [
+        "리토폴로지",
+        "retopology",
+        "로우폴 변환",
+        "쿼드 리토폴"
+      ],
+      "file": "skills/retopology/SKILL.md",
+      "summary": "Converts high-poly sculpts into clean quad-dominant low-poly game models."
+    },
+    {
+      "id": "uv-workflow",
+      "domain": "materials",
+      "name": "UV Unwrapping & Packing",
+      "triggers": [
+        "UV",
+        "uv workflow",
+        "uv 언랩",
+        "uv 패킹",
+        "seam"
+      ],
+      "file": "skills/uv-workflow/SKILL.md",
+      "summary": "Marks seams on hard edges, unwraps angle-based islands, and packs UVs."
+    },
+    {
+      "id": "reference-image-match",
+      "domain": "environment",
+      "name": "Reference Image Match Modeling",
+      "triggers": [
+        "레퍼런스 매칭",
+        "reference match",
+        "이미지 대조",
+        "컨셉아트 매칭"
+      ],
+      "file": "skills/reference-image-match/SKILL.md",
+      "summary": "Aligns camera perspective to concept art and compares modeling silhouette."
+    },
+    {
+      "id": "environment-artist",
+      "domain": "environment",
+      "name": "Environment Modular Building",
+      "triggers": [
+        "환경 아티스트",
+        "environment artist",
+        "배경 제작",
+        "던전",
+        "모듈러 배경"
+      ],
+      "file": "skills/environment-artist/SKILL.md",
+      "summary": "Builds modular architectural kits, corridors, and structural environment props."
+    },
+    {
+      "id": "horror-style",
+      "domain": "camera_lighting",
+      "name": "Horror Style & Decaying Atmosphere",
+      "triggers": [
+        "호러",
+        "horror",
+        "공포",
+        "음산한",
+        "decay",
+        "grimy"
+      ],
+      "file": "skills/horror-style/SKILL.md",
+      "summary": "Creates flickering lighting, decaying materials, and unsettling camera framing."
+    },
+    {
+      "id": "blender-hard-surface-modeling",
+      "domain": "hard_surface",
+      "name": "Composio Hard Surface Modeling",
+      "triggers": [
+        "하드서페이스 모델링",
+        "hard surface modeling",
+        "composio hard surface"
+      ],
+      "file": "skills/blender-hard-surface-modeling/SKILL.md",
+      "summary": "Subdivision surface, edge creasing, and non-destructive beveling workflow."
+    },
+    {
+      "id": "blender-python-integration",
+      "domain": "pipeline_gamedev",
+      "name": "Blender Python Integration",
+      "triggers": [
+        "파이썬 연동",
+        "blender python",
+        "bpy 스크립팅",
+        "python integration"
+      ],
+      "file": "skills/blender-python-integration/SKILL.md",
+      "summary": "Clean bpy scripting conventions, scene traversal, context overrides, and robust error handling."
+    },
+    {
+      "id": "blender-rigging-animation",
+      "domain": "rigging",
+      "name": "Composio Rigging & Animation",
+      "triggers": [
+        "리깅 애니메이션",
+        "blender rigging",
+        "뼈대 애니",
+        "bone hierarchy"
+      ],
+      "file": "skills/blender-rigging-animation/SKILL.md",
+      "summary": "Armature setup, bone hierarchies, IK constraints, and action keyframing."
+    },
+    {
+      "id": "blender-animation",
+      "domain": "animation",
+      "name": "LobeHub Blender Animation",
+      "triggers": [
+        "애니메이션 자동화",
+        "terminal animation",
+        "키프레임 생성"
+      ],
+      "file": "skills/blender-animation/SKILL.md",
+      "summary": "Terminal and MCP automated keyframing for object transforms and cameras."
+    },
+    {
+      "id": "blender-pipeline-integration",
+      "domain": "pipeline_gamedev",
+      "name": "Blender Pipeline Integration",
+      "triggers": [
+        "파이프라인 통합",
+        "pipeline integration",
+        "mcp blender integration"
+      ],
+      "file": "skills/blender-pipeline-integration/SKILL.md",
+      "summary": "Standardized MCP JSON-RPC protocol bridge between AI agents and active Blender sessions."
+    }
+  ]
+}
