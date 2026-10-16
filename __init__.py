@@ -1,7 +1,7 @@
 bl_info = {
     "name": "MCP Chat for Blender (Android & Termux & PC)",
     "author": "Antigravity & Blender Community",
-    "version": (0, 8, 0),
+    "version": (0, 8, 1),
     "blender": (3, 0, 0),
     "location": "3D Viewport > Sidebar > MCP Chat",
     "description": "Embedded In-Blender Chat with 3 Session Tabs, Up to 3 Images, 8-row Scroll, Plan/Auto Mode, Claude Code & agy CLI Integration",
@@ -2361,11 +2361,6 @@ class MCPCHAT_PT_queue_panel(Panel):
                 row_opt = layout.row(align=True)
                 row_opt.prop(scene, "mcpchat_queue_delay", text="전역 딜레이(초)")
 
-            row_save = layout.row(align=True)
-            row_save.label(text="자동 저장:", icon='FILE_TICK')
-            row_save.prop(scene, "mcpchat_auto_save_blend", toggle=True)
-            row_save.prop(scene, "mcpchat_auto_save_image", toggle=True)
-
             # List of Tasks in Queue
             layout.separator(factor=0.5)
             tasks = session_mgr.list_queue_tasks(limit=30, light=True)
@@ -2436,6 +2431,10 @@ class MCPCHAT_PT_queue_panel(Panel):
             row_pk = box_out.row(align=True)
             row_pk.prop(scene, "mcpchat_auto_save_pack", toggle=True)
             row_pk.prop(scene, "mcpchat_auto_save_glb", toggle=True)
+            row_save = box_out.row(align=True)
+            row_save.label(text="자동 저장:", icon='FILE_TICK')
+            row_save.prop(scene, "mcpchat_auto_save_blend", toggle=True)
+            row_save.prop(scene, "mcpchat_auto_save_image", toggle=True)
 
         except Exception as e:
             layout.label(text=f"작업큐 로딩 오류: {e}", icon='ERROR')
