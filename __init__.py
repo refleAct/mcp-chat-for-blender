@@ -81,6 +81,7 @@ DETAIL_WRAP_WIDTH = 46
 SUMMARY_MAX_LEN = 220
 SUMMARY_WRAP_WIDTH = 42
 SUMMARY_MAX_LINES = 5
+HISTORY_ROWS = 5   # 채팅 히스토리에 한 번에 보이는 줄 수 (넘치면 스크롤)
 LINE_WRAP_WIDTH = 36
 MAX_EXPANDED_LINES = 80
 CLI_ENGINES = {
@@ -2244,7 +2245,7 @@ class MCPCHAT_PT_chat_panel(Panel):
             if len(scene.mcpchat_lines) == 0:
                 box_history.label(text="대화 기록이 없습니다. 프롬프트를 입력하세요.", icon='INFO')
             else:
-                rows = max(4, scene.mcpchat_history_rows)
+                rows = HISTORY_ROWS
                 box_history.template_list(
                     "MCPCHAT_UL_lines", "", scene, "mcpchat_lines", scene, "mcpchat_active_line",
                     rows=rows, maxrows=rows
@@ -2252,7 +2253,6 @@ class MCPCHAT_PT_chat_panel(Panel):
                 row_rows = box_history.row(align=True)
                 row_rows.alignment = 'RIGHT'
                 row_rows.prop(scene, "mcpchat_wrap_cells")
-                row_rows.prop(scene, "mcpchat_history_rows", text="표시 줄 수")
 
             layout.separator(factor=0.5)
 
@@ -2709,8 +2709,6 @@ def register():
         name="줄 너비", description="한 줄에 들어가는 글자 폭 (한글 2칸·영문 1칸). 말줄임(...)이 보이면 줄이세요",
         default=34, min=16, max=100,
         update=lambda self, ctx: rebuild_lines(self))
-    bpy.types.Scene.mcpchat_history_rows = IntProperty(
-        name="표시 줄 수", description="채팅 히스토리에 한 번에 보이는 줄 수 (넘치면 스크롤)", default=10, min=4, max=40)
     bpy.types.Scene.mcpchat_queue_delay = IntProperty(
         name="Queue Delay (s)",
         description="작업과 작업 사이 대기 시간(초)",
@@ -2745,7 +2743,7 @@ def unregister():
     for prop in [
         'mcpchat_active_tab', 'mcpchat_messages', 'mcpchat_scroll', 'mcpchat_lines', 'mcpchat_active_line',
         'mcpchat_attached_images', 'mcpchat_prompt', 'mcpchat_mode',
-        'mcpchat_backend', 'mcpchat_queue_delay', 'mcpchat_history_rows',
+        'mcpchat_backend', 'mcpchat_queue_delay',
         'mcpchat_claude_model', 'mcpchat_claude_effort', 'mcpchat_agy_model',
         'mcpchat_agy_effort', 'mcpchat_codex_model', 'mcpchat_codex_effort',
         'mcpchat_auto_save_blend', 'mcpchat_auto_save_image', 'mcpchat_plan_refine',
