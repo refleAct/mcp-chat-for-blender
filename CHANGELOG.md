@@ -2,6 +2,14 @@
 
 버전 규칙: 기능 추가 = 0.1 단위, 버그 수정 = 0.0.1 단위 (최대 .999)
 
+## 0.9.0
+- Skills Vault & Dynamic 2-Tier Injection: integrated 29 specialized skills across 10 domains with zero prompt bloat
+- Plugin Autonomy: detects installed Blender addons (Node Wrangler, Rigify, Bool Tool, LoopTools), auto-enables, and provides graceful fallback to standard bpy
+- Procedural Texture & Baking: added procedural PBR shader generator (Noise/Voronoi/Bump) and High-to-Low normal/AO texture baking
+- Caveman Protocol: strict telegraphic communication protocol in guidelines v4
+- Tools & Integration: added `lookup_blender_skill` tool and synced skills across Claude Code (`.claude/skills`) and Antigravity (`.agents/skills`)
+- Blender 5.x LTS compatibility: slotted animation action curve safety and Principled BSDF socket compatibility
+
 ## 0.8.6
 - Web UI: English by default with a language selector (English / 한국어 / 中文 / 日本語); the whole UI, dialogs and example prompts are translated
 - Web UI fix: the settings dialog was always visible because `display: flex` overrode the `hidden` attribute, so Save/Cancel appeared to do nothing
