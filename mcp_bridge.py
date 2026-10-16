@@ -2,79 +2,120 @@
 """
 MCP Stdio-to-HTTP Bridge
 Cross-platform bridge for Claude Code and agy CLI (Windows, Android Termux, Linux, macOS).
-Forwards JSON-RPC between stdio and Blender MCP HTTP Server (http://127.0.0.1:8000/mcp).
+Forwards JSON-RPC between stdio and the Blender MCP HTTP Server.
 Zero dependencies.
+
+Connection settings (priority order):
+  1. env  BLENDER_MCP_URL / BLENDER_MCP_TOKEN
+  2. ~/.config/blender_mcp_chat/bridge.json  {"url": "...", "token": "..."}
+  3. default http://127.0.0.1:8000/mcp (로컬 접속, 토큰 불필요)
+
+Usage:  mcp_bridge.py           stdio bridge (MCP client가 실행)
+        mcp_bridge.py --check   연결/토큰/도구 목록 점검
 """
 
-import sys
+import io
 import json
-import urllib.request
+import os
+import sys
 import urllib.error
+import urllib.request
 
-ENDPOINT = "http://127.0.0.1:8000/mcp"
+DEFAULT_ENDPOINT = "http://127.0.0.1:8000/mcp"
+
+
+def load_config():
+    url, token = DEFAULT_ENDPOINT, ""
+    cfg_path = os.path.join(os.path.expanduser("~"), ".config", "blender_mcp_chat", "bridge.json")
+    try:
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        url = cfg.get("url") or url
+        token = cfg.get("token") or token
+    except Exception:
+        pass
+    return os.environ.get("BLENDER_MCP_URL", url), os.environ.get("BLENDER_MCP_TOKEN", token)
+
+
+ENDPOINT, TOKEN = load_config()
 
 # Ensure UTF-8 I/O encoding on Windows and POSIX
 if hasattr(sys.stdin, "buffer"):
-    import io
     sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding="utf-8", errors="replace")
 if hasattr(sys.stdout, "buffer"):
-    import io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 
+def post(req_data, timeout=120):
+    headers = {"Content-Type": "application/json; charset=utf-8"}
+    if TOKEN:
+        headers["Authorization"] = f"Bearer {TOKEN}"
+    req = urllib.request.Request(
+        ENDPOINT,
+        data=json.dumps(req_data, ensure_ascii=False).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read().decode("utf-8")
+
+
+def error_response(req_id, message):
+    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32000, "message": message}}
+
+
+def emit(obj):
+    sys.stdout.write(json.dumps(obj, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
+
+
+def check():
+    print(f"endpoint: {ENDPOINT}")
+    print(f"token   : {'설정됨' if TOKEN else '없음 (로컬 접속만 가능)'}")
+    try:
+        out = post({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, timeout=10)
+        tools = [t.get("name") for t in json.loads(out).get("result", {}).get("tools", [])]
+        print("OK - 도구:", ", ".join(tools) or "(없음)")
+        return 0
+    except urllib.error.HTTPError as e:
+        hint = " (토큰이 틀렸거나 없습니다)" if e.code == 401 else ""
+        print(f"FAIL - HTTP {e.code}{hint}")
+    except Exception as e:
+        print(f"FAIL - {e}\n  Blender 실행/서버 시작, PC IP, 방화벽(TCP 포트), 'LAN 접속 허용'을 확인하세요.")
+    return 1
+
+
 def main():
+    if "--check" in sys.argv:
+        sys.exit(check())
+
     while True:
         try:
             line = sys.stdin.readline()
             if not line:
                 break
-            
             line = line.strip()
             if not line:
                 continue
 
-            # Parse incoming JSON-RPC line
-            req_data = json.loads(line)
-            req_bytes = json.dumps(req_data, ensure_ascii=False).encode("utf-8")
-
-            # Forward to Blender MCP Add-on Server
-            req = urllib.request.Request(
-                ENDPOINT,
-                data=req_bytes,
-                headers={"Content-Type": "application/json; charset=utf-8"},
-                method="POST"
-            )
+            try:
+                req_data = json.loads(line)
+            except json.JSONDecodeError as e:
+                emit(error_response(None, f"Invalid JSON: {e}"))
+                continue
 
             try:
-                with urllib.request.urlopen(req, timeout=120) as resp:
-                    resp_bytes = resp.read()
-                    if resp_bytes:
-                        sys.stdout.write(resp_bytes.decode("utf-8") + "\n")
-                        sys.stdout.flush()
+                out = post(req_data)
+                if out:
+                    sys.stdout.write(out.strip() + "\n")
+                    sys.stdout.flush()
             except urllib.error.HTTPError as e:
-                err_body = e.read().decode("utf-8", errors="ignore")
-                err_resp = {
-                    "jsonrpc": "2.0",
-                    "id": req_data.get("id"),
-                    "error": {
-                        "code": -32000,
-                        "message": f"Blender MCP HTTP Error {e.code}: {err_body}"
-                    }
-                }
-                sys.stdout.write(json.dumps(err_resp, ensure_ascii=False) + "\n")
-                sys.stdout.flush()
+                body = e.read().decode("utf-8", errors="ignore")
+                if req_data.get("id") is not None:
+                    emit(error_response(req_data.get("id"), f"Blender MCP HTTP Error {e.code}: {body}"))
             except Exception as e:
-                err_resp = {
-                    "jsonrpc": "2.0",
-                    "id": req_data.get("id"),
-                    "error": {
-                        "code": -32000,
-                        "message": f"Failed to connect to Blender on {ENDPOINT}. Is Blender running with MCP Chat enabled? Details: {str(e)}"
-                    }
-                }
-                sys.stdout.write(json.dumps(err_resp, ensure_ascii=False) + "\n")
-                sys.stdout.flush()
-
+                if req_data.get("id") is not None:
+                    emit(error_response(req_data.get("id"), f"Failed to connect to Blender on {ENDPOINT}. Details: {e}"))
         except KeyboardInterrupt:
             break
         except Exception as e:

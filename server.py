@@ -8,6 +8,8 @@ import os
 import json
 import mimetypes
 import threading
+import hmac
+import socket
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from urllib.parse import urlparse, parse_qs
@@ -27,19 +29,91 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     allow_reuse_address = True
 
 
+LOOPBACK_ADDRS = {"127.0.0.1", "::1", "::ffff:127.0.0.1"}
+LOCAL_HOSTNAMES = {"localhost", "127.0.0.1", "[::1]"}
+PUBLIC_PATHS = {"/", "/index.html", "/api/status"}
+PROTECTED_SETTING_KEYS = {"mcp_token", "allow_lan", "cli_remote_token"}
+MAX_BODY_BYTES = 64 * 1024 * 1024  # 이미지 base64 포함 요청 상한
+DOWNLOADABLE = {"mcp_bridge.py", "termux_agent.py", "cli_runner.py", "guidelines.py"}
+
+
+def get_lan_ips():
+    """이 PC의 LAN IPv4 주소 목록 (Termux에서 접속할 주소 안내용)."""
+    ips = []
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("10.255.255.255", 1))  # 실제 전송 없음, 라우팅 인터페이스 조회용
+        ips.append(s.getsockname()[0])
+        s.close()
+    except Exception:
+        pass
+    try:
+        for ip in socket.gethostbyname_ex(socket.gethostname())[2]:
+            if not ip.startswith("127.") and ip not in ips:
+                ips.append(ip)
+    except Exception:
+        pass
+    return ips
+
+
 class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         # Suppress noisy logs, can be turned on for debugging
         pass
 
+    # -------------------------------------------------------------
+    # Security: Origin / Host / Bearer token
+    #  - 로컬(loopback) 접속: 토큰 불필요, 단 Host가 localhost 계열이고 Origin이 same-origin이어야 함
+    #    (악성 웹페이지의 CORS / DNS rebinding 공격 차단)
+    #  - 그 외(LAN) 접속: Authorization: Bearer <token> 필수
+    # -------------------------------------------------------------
+
+    def _is_loopback(self) -> bool:
+        return self.client_address[0] in LOOPBACK_ADDRS
+
+    def _origin_ok(self) -> bool:
+        origin = self.headers.get("Origin")
+        if not origin:
+            return True
+        return urlparse(origin).netloc == self.headers.get("Host", "")
+
+    def _host_ok(self) -> bool:
+        host_header = self.headers.get("Host", "") or ""
+        host = "[::1]" if host_header.startswith("[") else host_header.rsplit(":", 1)[0]
+        return host in LOCAL_HOSTNAMES
+
+    def _token_ok(self) -> bool:
+        token = session_mgr.get_or_create_token()
+        auth = self.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            cand = auth[7:].strip()
+        else:
+            cand = parse_qs(urlparse(self.path).query).get("token", [""])[0]
+        return bool(cand) and hmac.compare_digest(cand.encode(), token.encode())
+
+    def _gate(self, path: str) -> bool:
+        """True면 요청 허용. 거부 시 응답까지 전송."""
+        if path in PUBLIC_PATHS or path.startswith("/static/"):
+            return True
+        if not self._origin_ok():
+            self._send_json(403, {"error": "Cross-origin request blocked"})
+            return False
+        if self._is_loopback():
+            if not self._host_ok():
+                self._send_json(403, {"error": "Invalid Host header"})
+                return False
+            return True
+        if self._token_ok():
+            return True
+        self._send_json(401, {"error": "Unauthorized: Bearer token required (Preferences > LAN 접속)"})
+        return False
+
     def _send_cors_headers(self):
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        # same-origin 요청만 사용하므로 CORS 허용 헤더를 내보내지 않는다 (와일드카드 제거).
+        pass
 
     def do_OPTIONS(self):
         self.send_response(204)
-        self._send_cors_headers()
         self.end_headers()
 
     def _send_json(self, status_code: int, data: dict):
@@ -54,6 +128,8 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
     def _read_json_body(self) -> dict:
         try:
             content_length = int(self.headers.get("Content-Length", 0))
+            if content_length > MAX_BODY_BYTES:
+                return {}
             if content_length > 0:
                 raw_data = self.rfile.read(content_length).decode("utf-8")
                 return json.loads(raw_data)
@@ -68,6 +144,26 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
+        if not self._gate(path):
+            return
+
+        # Termux 연동용: 브릿지 / 원라인 설치 스크립트 배포
+        if path == "/bridge.py" or path.startswith("/dl/"):
+            name = "mcp_bridge.py" if path == "/bridge.py" else path[len("/dl/"):]
+            if name not in DOWNLOADABLE:
+                self._send_json(404, {"error": "not found"})
+                return
+            self._serve_static_file("", force_type="text/x-python", force_name=name)
+            return
+        elif path == "/termux/setup.sh":
+            host = self.headers.get("Host", f"127.0.0.1:{server_mgr.port}")
+            body = build_termux_script(f"http://{host}", session_mgr.get_or_create_token()).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/x-shellscript; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
 
         # 1. Static Files & Web UI
         if path == "/" or path == "/index.html":
@@ -102,7 +198,7 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
             return
 
         elif path == "/api/settings":
-            settings = session_mgr.get_all_settings()
+            settings = {k: val for k, val in session_mgr.get_all_settings().items() if k not in PROTECTED_SETTING_KEYS}
             self._send_json(200, {"settings": settings})
             return
 
@@ -157,6 +253,8 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         path = parsed.path
+        if not self._gate(path):
+            return
         body = self._read_json_body()
 
         # 1. MCP JSON-RPC Endpoint (for Claude Code, agy CLI, and mcp_bridge)
@@ -209,7 +307,7 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
                 session_mgr.update_session_title(session_id, short_title)
 
             # Load provider configuration
-            settings = session_mgr.get_all_settings()
+            settings = session_mgr.get_all_settings(include_secrets=True)
             active_provider = session.get("provider") or settings.get("active_provider", "openrouter")
             
             api_key = ""
@@ -287,8 +385,8 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
 
         # 4. REST API: Update Settings
         elif path == "/api/settings":
-            session_mgr.update_settings(body)
-            self._send_json(200, {"status": "updated", "settings": session_mgr.get_all_settings()})
+            session_mgr.update_settings({k: val for k, val in body.items() if k not in PROTECTED_SETTING_KEYS})
+            self._send_json(200, {"status": "updated", "settings": {k: val for k, val in session_mgr.get_all_settings().items() if k not in PROTECTED_SETTING_KEYS}})
             return
 
         # 5. REST API: Direct Code Execution from UI
@@ -338,7 +436,7 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(400, {"error": "Prompt is required"})
                 return
 
-            settings = session_mgr.get_all_settings()
+            settings = session_mgr.get_all_settings(include_secrets=True)
             provider = body.get("provider") or settings.get("active_provider", "openrouter")
             model = body.get("model") or settings.get(f"{provider}_model", "anthropic/claude-3.5-sonnet")
             api_key = settings.get(f"{provider}_api_key", "")
@@ -366,42 +464,19 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(400, {"error": "Prompt is required"})
                 return
 
-            settings = session_mgr.get_all_settings()
-            provider = body.get("provider") or settings.get("active_provider", "openrouter")
-            model = body.get("model") or settings.get(f"{provider}_model", "anthropic/claude-3.5-sonnet")
-            api_key = settings.get(f"{provider}_api_key", "")
-            base_url = settings.get(f"{provider}_base_url", "")
-
-            client = LLMClient({
-                "provider": provider,
-                "api_key": api_key,
-                "base_url": base_url,
-                "model": model,
-                "reasoning_effort": settings.get("reasoning_effort", "medium")
-            })
-
             try:
-                # 1. Generate plan
-                plan = client.generate_plan(prompt)
-                steps = plan.get("steps", [])
-
-                # 2. Convert steps to queue tasks
-                batch_tasks = []
-                for s in steps:
-                    batch_tasks.append({
-                        "title": s.get("title", f"Step {s.get('step_number', 1)}"),
-                        "task_type": s.get("task_type", "code"),
-                        "payload": {"code": s.get("code", "")}
-                    })
-
-                # 3. Add to queue & start worker
+                # 하나의 지시 = 하나의 큐 작업 (계획 생성/단계 실행은 작업 내부에서 처리)
+                task_queue.resume()
                 task_queue.start()
-                enqueued = session_mgr.enqueue_batch_tasks(batch_tasks)
-
+                task = session_mgr.enqueue_task(
+                    title=prompt.splitlines()[0][:30],
+                    task_type="auto_plan",
+                    payload={"prompt": prompt, "backend": "API"}
+                )
                 self._send_json(200, {
                     "status": "auto_started",
-                    "plan": plan,
-                    "enqueued_count": len(enqueued),
+                    "task": task,
+                    "enqueued_count": 1,
                     "queue_status": task_queue.get_status()
                 })
             except Exception as e:
@@ -417,6 +492,8 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
     def do_PATCH(self):
         parsed = urlparse(self.path)
         path = parsed.path
+        if not self._gate(path):
+            return
         body = self._read_json_body()
 
         if path.startswith("/api/sessions/"):
@@ -439,6 +516,8 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
     def do_DELETE(self):
         parsed = urlparse(self.path)
         path = parsed.path
+        if not self._gate(path):
+            return
 
         if path.startswith("/api/sessions/"):
             session_id = path[len("/api/sessions/"):].strip("/")
@@ -452,19 +531,25 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
     # Static Files Serving Helper
     # -------------------------------------------------------------
 
-    def _serve_static_file(self, rel_path: str):
+    def _serve_static_file(self, rel_path: str, force_type: Optional[str] = None, force_name: str = "mcp_bridge.py"):
         base_dir = os.path.dirname(os.path.abspath(__file__))
         static_dir = os.path.join(base_dir, "static")
-        safe_path = os.path.normpath(os.path.join(static_dir, rel_path))
+        if force_type:
+            # 허용된 단일 파일(mcp_bridge.py)만 static 밖에서 제공
+            safe_path = os.path.join(base_dir, force_name)
+            in_scope = force_name in DOWNLOADABLE
+        else:
+            safe_path = os.path.normpath(os.path.join(static_dir, rel_path))
+            in_scope = safe_path.startswith(static_dir + os.sep)
 
         # Security check to prevent directory traversal
-        if not safe_path.startswith(static_dir) or not os.path.exists(safe_path) or os.path.isdir(safe_path):
+        if not in_scope or not os.path.exists(safe_path) or os.path.isdir(safe_path):
             self.send_response(404)
             self.end_headers()
             self.wfile.write(b"404 Not Found")
             return
 
-        mime_type, _ = mimetypes.guess_type(safe_path)
+        mime_type = force_type or mimetypes.guess_type(safe_path)[0]
         if not mime_type:
             mime_type = "application/octet-stream"
 
@@ -484,6 +569,84 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(str(e).encode("utf-8"))
 
 
+_TERMUX_SCRIPT = r'''#!/usr/bin/env bash
+# Blender MCP - Termux 원라인 설정 (PC의 Blender에 연결)
+set -e
+URL="@@URL@@"
+TOKEN="@@TOKEN@@"
+DIR="$HOME/.config/blender_mcp_chat"
+mkdir -p "$DIR"
+
+echo "[1/4] PC 서버 연결 확인: $URL"
+curl -fsS --max-time 8 "$URL/api/status" >/dev/null || { echo "연결 실패: PC IP/포트, 방화벽(TCP @@PORT@@), Preferences의 'LAN 접속 허용'을 확인하세요."; exit 1; }
+
+PY="$(command -v python3 || command -v python || true)"
+[ -n "$PY" ] || { echo "python이 필요합니다: pkg install python"; exit 1; }
+
+echo "[2/4] MCP 브릿지 다운로드"
+curl -fsS -H "Authorization: Bearer $TOKEN" "$URL/bridge.py" -o "$DIR/mcp_bridge.py"
+chmod +x "$DIR/mcp_bridge.py"
+umask 077
+printf '{"url": "%s/mcp", "token": "%s"}\n' "$URL" "$TOKEN" > "$DIR/bridge.json"
+
+echo "[3/4] Claude Code 등록"
+if command -v claude >/dev/null 2>&1; then
+  claude mcp remove blender -s user >/dev/null 2>&1 || true
+  claude mcp add -s user blender -- "$PY" "$DIR/mcp_bridge.py" && echo "  claude: 등록 완료"
+else
+  echo "  claude 미설치 - 건너뜀"
+fi
+
+echo "[4/4] agy 등록"
+"$PY" - "$DIR/mcp_bridge.py" <<'PYEND'
+import json, os, sys
+bridge = sys.argv[1]
+d = os.path.expanduser("~/.gemini/config"); os.makedirs(d, exist_ok=True)
+p = os.path.join(d, "mcp_config.json")
+try:
+    cfg = json.load(open(p, encoding="utf-8"))
+except Exception:
+    cfg = {}
+cfg.setdefault("mcpServers", {})["blender"] = {"command": sys.executable, "args": [bridge]}
+json.dump(cfg, open(p, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
+print("  agy: 등록 완료 ->", p)
+PYEND
+
+echo "[5/5] Termux Agent 설치 (Blender APK가 Termux의 CLI를 실행하도록 중계)"
+mkdir -p "$DIR/agent"
+for f in termux_agent.py cli_runner.py guidelines.py; do
+  curl -fsS -H "Authorization: Bearer $TOKEN" "$URL/dl/$f" -o "$DIR/agent/$f"
+done
+AGENT_TOKEN="$("$PY" "$DIR/agent/termux_agent.py" --init)"
+# 재시작용 런처 (Termux 재시작/종료 후에는 이 파일을 실행)
+cat > "$DIR/start_agent.sh" <<LAUNCH
+#!/usr/bin/env bash
+command -v termux-wake-lock >/dev/null 2>&1 && termux-wake-lock
+pkill -f termux_agent.py >/dev/null 2>&1 || true
+nohup "$PY" "$DIR/agent/termux_agent.py" > "$DIR/agent.log" 2>&1 &
+sleep 1
+curl -fsS --max-time 3 http://127.0.0.1:8787/health >/dev/null && echo "Agent OK (127.0.0.1:8787)" || { echo "Agent 시작 실패. 로그:"; tail -n 20 "$DIR/agent.log"; }
+LAUNCH
+chmod +x "$DIR/start_agent.sh"
+bash "$DIR/start_agent.sh"
+
+echo "연결 점검:"
+"$PY" "$DIR/mcp_bridge.py" --check
+echo ""
+echo "================================================================"
+echo " Blender > Preferences > Add-ons > MCP Chat > Termux Agent 에 입력:"
+echo "   URL  : http://127.0.0.1:8787"
+echo "   토큰 : $AGENT_TOKEN"
+echo " Termux를 닫았거나 재부팅했다면 먼저 실행: bash $DIR/start_agent.sh"
+echo "================================================================"
+'''
+
+
+def build_termux_script(base_url: str, token: str) -> str:
+    port = base_url.rsplit(":", 1)[-1]
+    return _TERMUX_SCRIPT.replace("@@URL@@", base_url).replace("@@TOKEN@@", token).replace("@@PORT@@", port)
+
+
 class BlenderServerManager:
     def __init__(self):
         self.server: Optional[ThreadedHTTPServer] = None
@@ -491,11 +654,16 @@ class BlenderServerManager:
         self.port = 8000
         self.is_running = False
 
-    def start(self, host="0.0.0.0", port=8000):
+    def start(self, host=None, port=8000):
         if self.is_running:
             return True, f"Server is already running on port {self.port}"
 
-        self.port = int(session_mgr.get_setting("port", port))
+        if host is None:
+            allow_lan = str(session_mgr.get_setting("allow_lan", "false")).lower() == "true"
+            host = "0.0.0.0" if allow_lan else "127.0.0.1"
+            session_mgr.get_or_create_token()
+
+        self.port = int(port)  # Preferences의 포트 설정을 그대로 사용
         
         # Ensure bridge timer is active inside Blender
         bridge.start_timer()
@@ -506,7 +674,8 @@ class BlenderServerManager:
             self.server_thread.start()
             self.is_running = True
             task_queue.start() # Start task queue worker
-            return True, f"Blender MCP Chat Server started on http://127.0.0.1:{self.port}"
+            mode = "LAN 허용(토큰 인증)" if host == "0.0.0.0" else "로컬 전용"
+            return True, f"Blender MCP Chat Server started on http://127.0.0.1:{self.port} [{mode}]"
         except (PermissionError, OSError) as e:
             # Fallback for Android/SELinux or restricted environments if 0.0.0.0 fails
             if host != "127.0.0.1":

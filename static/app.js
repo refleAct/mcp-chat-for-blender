@@ -1,3 +1,19 @@
+// --- LAN 접속용 토큰: URL ?token=XXX 로 1회 저장 후 모든 fetch에 Authorization 자동 부착 ---
+(() => {
+  try {
+    const q = new URLSearchParams(location.search).get("token");
+    if (q) { localStorage.setItem("mcp_token", q); history.replaceState(null, "", location.pathname); }
+  } catch (e) {}
+  const orig = window.fetch.bind(window);
+  window.fetch = (url, opts = {}) => {
+    try {
+      const t = localStorage.getItem("mcp_token");
+      if (t) opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: "Bearer " + t } };
+    } catch (e) {}
+    return orig(url, opts);
+  };
+})();
+
 /**
  * Blender MCP AI Assistant Frontend Logic
  * Touch & Mobile First, Multi-session, Vision Multimodal, Reasoning controls.
@@ -519,7 +535,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await res.json();
         if (data.status === "auto_started") {
           const plan = data.plan || {};
-          let replyText = `⚡ **Auto Mode 가동 시작**\n총 **${data.enqueued_count}개 작업**이 작업큐에 등록되었습니다.\n전역 딜레이 간격으로 순차 실행되며, 완료 시마다 .blend 스냅샷과 렌더 이미지가 자동 저장됩니다.\n\n**계획 개요**: ${plan.summary || ""}`;
+          let replyText = `⚡ **Auto Mode 가동 시작**\n지시가 작업큐 **1건**으로 등록되었습니다. 계획 수립과 단계 실행은 이 작업 안에서 순차 처리되며, 완료 시 .blend 스냅샷과 렌더 이미지가 자동 저장됩니다.`;
           appendMessageUI({
             role: "assistant",
             content: replyText
@@ -744,7 +760,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("cfg-port").value = s.port || "8000";
 
     const queueDelayInput = document.getElementById("cfg-queue-delay");
-    if (queueDelayInput) queueDelayInput.value = s.queue_delay_seconds || "2.0";
+    if (queueDelayInput) queueDelayInput.value = Math.round(parseFloat(s.queue_delay_seconds || "60"));
 
     const autoBlendInput = document.getElementById("cfg-auto-blend");
     if (autoBlendInput) autoBlendInput.checked = s.auto_save_blend !== "false";
@@ -790,7 +806,7 @@ document.addEventListener("DOMContentLoaded", () => {
       thinking_budget: document.getElementById("cfg-thinking-budget").value,
       temperature: temperatureSlider.value,
       port: document.getElementById("cfg-port").value,
-      queue_delay_seconds: document.getElementById("cfg-queue-delay") ? document.getElementById("cfg-queue-delay").value : "2.0",
+      queue_delay_seconds: document.getElementById("cfg-queue-delay") ? document.getElementById("cfg-queue-delay").value : "60",
       auto_save_blend: document.getElementById("cfg-auto-blend")?.checked ? "true" : "false",
       auto_save_image: document.getElementById("cfg-auto-image")?.checked ? "true" : "false"
     };
@@ -828,7 +844,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data.status) {
         const counts = data.status.counts || {};
         const isPaused = data.status.is_paused;
-        const delay = data.status.delay_seconds || 2.0;
+        const delay = Math.round(data.status.delay_seconds ?? 60);
 
         let statusStr = `Queue: ${counts.pending || 0}`;
         if (counts.running > 0) statusStr += ` (${counts.running} run)`;

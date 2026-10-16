@@ -11,6 +11,15 @@ import urllib.error
 import ssl
 from typing import List, Dict, Any, Optional, Callable
 from blender_bridge import bridge
+from guidelines import GUIDELINES as _GUIDELINES
+
+
+def _user_rules_block() -> str:
+    try:
+        import session_manager
+        return session_manager.session_mgr.get_user_rules_block()
+    except Exception:
+        return ""
 
 # Define tools available to LLM
 BLENDER_TOOLS = [
@@ -61,7 +70,74 @@ BLENDER_TOOLS = [
 ]
 
 
+def build_plan_system() -> str:
+    return """You are a senior 3D Technical Director and Blender Python architect.
+Your role is PLAN MODE: Decompose the user's 3D modeling/rendering request into clean, sequential, executable steps.
+For each step, provide clean, self-contained Blender Python code (using bpy).
+
+""" + _GUIDELINES + _user_rules_block() + """
+
+You MUST output ONLY a valid JSON object matching this schema (no surrounding text or commentary):
+{
+  "plan_title": "Short title of the plan",
+  "summary": "High level overview of what will be built",
+  "steps": [
+    {
+      "step_number": 1,
+      "title": "Step title (e.g. Create Base Geometry & Collections)",
+      "description": "Explanation of this step",
+      "task_type": "code",
+      "code": "# Python code using bpy\\n..."
+    }
+  ]
+}
+Each step's code must be robust, handle existing objects if needed, and advance the scene sequentially."""
+
+
+def compose_plan_messages(user_prompt: str, images=None):
+    """Plan/Auto 모드에서 AI에게 실제로 전달되는 메시지 (미리보기와 실제 전송이 같은 함수를 쓴다).
+    images: data URL 목록 -> 멀티모달 메시지로 첨부 이미지를 참고하게 한다."""
+    text = f"Please create a structured step-by-step Blender plan for: {user_prompt}"
+    user_content = text
+    imgs = [u for u in (images or []) if u]
+    if imgs:
+        user_content = [{"type": "text", "text": text + " (첨부 이미지를 참고하여 계획을 세우세요)"}]
+        user_content += [{"type": "image_url", "image_url": {"url": u}} for u in imgs]
+    return [
+        {"role": "system", "content": build_plan_system()},
+        {"role": "user", "content": user_content}
+    ]
+
+
 class LLMClient:
+    @classmethod
+    def from_settings(cls, settings: Dict[str, Any]) -> "LLMClient":
+        """settings DB 값으로 클라이언트 생성 (작업 큐 워커 등 백그라운드에서 사용)."""
+        provider = settings.get("active_provider", "openrouter")
+        api_key = ""
+        base_url = ""
+        if provider == "openrouter":
+            api_key = settings.get("openrouter_api_key", "")
+            model = settings.get("openrouter_model", "anthropic/claude-3.5-sonnet")
+        elif provider == "nvidia_nim":
+            api_key = settings.get("nvidia_nim_api_key", "")
+            model = settings.get("nvidia_nim_model", "meta/llama-3.3-70b-instruct")
+        elif provider == "local":
+            base_url = settings.get("local_base_url", "http://127.0.0.1:11434/v1")
+            model = settings.get("local_model", "qwen2.5-coder:latest")
+        else:
+            api_key = settings.get("custom_api_key", "")
+            base_url = settings.get("custom_base_url", "")
+            model = settings.get("custom_model", "gpt-4o")
+        return cls({
+            "provider": provider,
+            "api_key": api_key,
+            "base_url": base_url,
+            "model": model,
+            "reasoning_effort": settings.get("reasoning_effort", "medium"),
+            "thinking_budget": settings.get("thinking_budget", "2048"),
+        })
+
     def __init__(self, provider_config: Dict[str, Any]):
         """
         provider_config:
@@ -78,7 +154,7 @@ class LLMClient:
 
     def _resolve_endpoint(self):
         provider = self.config.get("provider", "openrouter")
-        api_key = self.config.get("api_key", "").strip()
+        api_key = (self.config.get("api_key") or "").strip()
         headers = {
             "Content-Type": "application/json",
             "User-Agent": "Blender-MCP-Chat/1.0"
@@ -312,35 +388,15 @@ class LLMClient:
             "captured_images": captured_images
         }
 
-    def generate_plan(self, user_prompt: str, context_messages: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    def generate_plan(self, user_prompt: str, context_messages: Optional[List[Dict[str, Any]]] = None,
+                      images: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Decomposes a user's 3D request into a structured multi-step execution plan
         ready for the Task Queue.
         """
-        plan_system = """You are a senior 3D Technical Director and Blender Python architect.
-Your role is PLAN MODE: Decompose the user's 3D modeling/rendering request into clean, sequential, executable steps.
-For each step, provide clean, self-contained Blender Python code (using bpy).
+        plan_system = build_plan_system()
 
-You MUST output ONLY a valid JSON object matching this schema (no surrounding text or commentary):
-{
-  "plan_title": "Short title of the plan",
-  "summary": "High level overview of what will be built",
-  "steps": [
-    {
-      "step_number": 1,
-      "title": "Step title (e.g. Create Base Geometry & Collections)",
-      "description": "Explanation of this step",
-      "task_type": "code",
-      "code": "# Python code using bpy\\n..."
-    }
-  ]
-}
-Each step's code must be robust, handle existing objects if needed, and advance the scene sequentially."""
-
-        messages = [
-            {"role": "system", "content": plan_system},
-            {"role": "user", "content": f"Please create a structured step-by-step Blender plan for: {user_prompt}"}
-        ]
+        messages = compose_plan_messages(user_prompt, images)
 
         model = self.config.get("model", "anthropic/claude-3.5-sonnet")
         temperature = 0.3  # Low temperature for precise JSON structuring
@@ -364,7 +420,13 @@ Each step's code must be robust, handle existing objects if needed, and advance 
         with urllib.request.urlopen(req, context=ctx, timeout=120) as resp:
             resp_body = resp.read().decode("utf-8")
             raw_data = json.loads(resp_body)
-            content_str = raw_data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            choices = raw_data.get("choices") or [{}]
+            message = (choices[0] or {}).get("message") or {}
+            # content가 null(추론만 반환/거부/오류 응답)이어도 안전하게 처리
+            content_str = message.get("content") or ""
+            if not content_str.strip():
+                err = (raw_data.get("error") or {}).get("message") if isinstance(raw_data.get("error"), dict) else raw_data.get("error")
+                raise RuntimeError(f"AI가 빈 응답을 반환했습니다{': ' + str(err) if err else ''}. 모델/API 키/추론 설정을 확인하세요.")
 
             # Extract JSON block if wrapped in markdown
             content_str = content_str.strip()
@@ -378,6 +440,9 @@ Each step's code must be robust, handle existing objects if needed, and advance 
 
             try:
                 parsed_plan = json.loads(content_str)
+                if not isinstance(parsed_plan, dict):
+                    raise ValueError("plan is not an object")
+                parsed_plan["steps"] = [s for s in (parsed_plan.get("steps") or []) if isinstance(s, dict)]
                 return parsed_plan
             except Exception:
                 # Fallback if json parsing fails

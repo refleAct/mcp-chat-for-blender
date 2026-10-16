@@ -31,6 +31,47 @@ class BlenderBridge:
         self.cmd_queue = queue.Queue()
         self.is_timer_running = False
         self._lock = threading.Lock()
+        self._exec_globals = {"__name__": "__blender_mcp__"}
+
+    # -------------------------------------------------------------
+    # Output location / flags (N패널 큐 패널 하단에서 지정)
+    # -------------------------------------------------------------
+
+    @staticmethod
+    def _setting(key, default=""):
+        try:
+            from session_manager import session_mgr
+            return str(session_mgr.get_setting(key, default) or default)
+        except Exception:
+            return default
+
+    def output_base_dir(self) -> str:
+        """사용자가 지정한 저장 위치. 비어 있거나 만들 수 없으면 기본 위치(<데이터폴더>/output)."""
+        base = self._setting("output_dir", "").strip()
+        if base:
+            try:
+                if IN_BLENDER:
+                    base = bpy.path.abspath(base)
+                base = os.path.expanduser(base)
+                os.makedirs(base, exist_ok=True)
+                return base
+            except Exception:
+                pass
+        return os.path.join(get_safe_data_dir(), "output")
+
+    @staticmethod
+    def _stamp_name(ext: str) -> str:
+        stem = "scene"
+        try:
+            if bpy.data.filepath:
+                stem = os.path.splitext(os.path.basename(bpy.data.filepath))[0] or stem
+        except Exception:
+            pass
+        return f"{stem}_{time.strftime('%Y%m%d_%H%M%S')}.{ext}"
+
+    def reset_namespace(self):
+        """코드 실행용 공유 네임스페이스 초기화."""
+        self._exec_globals = {"__name__": "__blender_mcp__"}
 
     def start_timer(self):
         """Registers the queue processing timer in Blender's main thread."""
@@ -112,14 +153,15 @@ class BlenderBridge:
             old_stdout = sys.stdout
             old_stderr = sys.stderr
 
-            # Provide standard Blender globals
-            exec_globals = {
+            # 실행 간 변수 유지 (여러 단계 계획에서 앞 단계의 변수를 뒤 단계가 사용) + 표준 전역 갱신
+            exec_globals = self._exec_globals
+            exec_globals.update({
                 'bpy': bpy,
                 'mathutils': sys.modules.get('mathutils'),
                 'context': bpy.context,
                 'C': bpy.context,
                 'D': bpy.data
-            }
+            })
 
             try:
                 sys.stdout = stdout_capture
@@ -144,7 +186,8 @@ class BlenderBridge:
                     "status": "error"
                 }
 
-        res = self.run_in_main_thread(_exec)
+        # 무거운 모델링 코드도 완료까지 기다린다 (타임아웃 후에도 코드는 계속 실행되므로 너무 짧으면 경합 발생)
+        res = self.run_in_main_thread(_exec, timeout=180.0)
         if res.get("success"):
             return res.get("result", {})
         return {"status": "error", "error": res.get("error", "Unknown error")}
@@ -195,8 +238,6 @@ class BlenderBridge:
             temp_dir = tempfile.gettempdir()
             screenshot_path = os.path.join(temp_dir, f"blender_mcp_shot_{int(time.time())}.png")
 
-            # Try capturing 3D Viewport window
-            window = bpy.context.window
             screen = bpy.context.screen
 
             # Find 3D Viewport area
@@ -254,34 +295,67 @@ class BlenderBridge:
     def save_blend_snapshot(self, custom_path=None) -> dict:
         """Saves a copy of the active .blend file to the output directory."""
         def _save():
-            data_dir = get_safe_data_dir()
-            output_dir = os.path.join(data_dir, "output", "blends")
+            output_dir = os.path.join(self.output_base_dir(), "blends")
             os.makedirs(output_dir, exist_ok=True)
+            target_path = custom_path or os.path.join(output_dir, self._stamp_name("blend"))
 
-            filename = f"snapshot_{int(time.time())}.blend"
-            target_path = custom_path or os.path.join(output_dir, filename)
+            # 리소스 패킹: 외부 텍스처/사운드/폰트를 .blend 안에 포함시켜 단독으로 열 수 있게 한다
+            packed, pack_failed = 0, []
+            if self._setting("auto_save_pack", "true").lower() == "true":
+                for img in bpy.data.images:
+                    try:
+                        if img.source == 'FILE' and img.filepath and not img.packed_file:
+                            img.pack()
+                            packed += 1
+                    except Exception:
+                        pack_failed.append(img.name)
+                for coll_name in ("sounds", "fonts"):
+                    for res in getattr(bpy.data, coll_name, []):
+                        try:
+                            fp = getattr(res, "filepath", "")
+                            if fp and fp != "<builtin>" and not res.packed_file:
+                                res.pack()
+                                packed += 1
+                        except Exception:
+                            pack_failed.append(res.name)
 
             try:
                 # Save a copy without changing active file path
                 bpy.ops.wm.save_as_mainfile(filepath=target_path, copy=True)
-                return {"status": "success", "filepath": target_path}
+                return {"status": "success", "filepath": target_path, "packed": packed, "pack_failed": pack_failed}
             except Exception as e:
                 return {"status": "error", "error": str(e)}
 
-        res = self.run_in_main_thread(_save, timeout=10.0)
+        res = self.run_in_main_thread(_save, timeout=120.0)
         if res.get("success"):
             return res.get("result", {})
         return {"status": "error", "error": res.get("error", "Failed to save blend snapshot")}
 
+    def export_glb(self, custom_path=None) -> dict:
+        """현재 씬을 .glb(glTF Binary)로 내보낸다."""
+        def _export():
+            out_dir = os.path.join(self.output_base_dir(), "glb")
+            os.makedirs(out_dir, exist_ok=True)
+            target_path = custom_path or os.path.join(out_dir, self._stamp_name("glb"))
+            try:
+                bpy.ops.export_scene.gltf(filepath=target_path, export_format='GLB')
+            except Exception as e:
+                return {"status": "error", "error": f"GLB export failed (glTF add-on enabled?): {e}"}
+            if not os.path.exists(target_path):
+                return {"status": "error", "error": "GLB file was not generated"}
+            return {"status": "success", "filepath": target_path}
+
+        res = self.run_in_main_thread(_export, timeout=180.0)
+        if res.get("success"):
+            return res.get("result", {})
+        return {"status": "error", "error": res.get("error", "Failed to export GLB")}
+
     def capture_and_save_viewport(self, custom_path=None) -> dict:
         """Captures viewport and permanently saves to the output directory."""
         def _save_img():
-            data_dir = get_safe_data_dir()
-            output_dir = os.path.join(data_dir, "output", "renders")
+            output_dir = os.path.join(self.output_base_dir(), "renders")
             os.makedirs(output_dir, exist_ok=True)
-
-            filename = f"render_{int(time.time())}.png"
-            target_path = custom_path or os.path.join(output_dir, filename)
+            target_path = custom_path or os.path.join(output_dir, self._stamp_name("png"))
 
             # Use OpenGL render for fast and true-to-viewport capture
             try:

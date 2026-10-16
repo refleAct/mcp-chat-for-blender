@@ -1,116 +1,193 @@
-# 🧊 Blender MCP AI Assistant (Android & Termux PRoot)
+# 🧊 MCP Chat for Blender  `v0.8`
 
-안드로이드 기기 내부의 **Termux PRoot Linux (Debian/Ubuntu)** 환경에서 실행되는 Blender와 완벽하게 연동되는 **AI 챗 어시스턴트 & MCP (Model Context Protocol) 애드온**입니다.
+Blender 3D 뷰포트 안에서 **AI와 대화하며 3D 모델링을 시키는 애드온**입니다.
+Claude Code · Codex · agy CLI · OpenRouter 등 여러 AI 엔진을 N패널 채팅창에서 바로 쓰고, AI가 만든 파이썬(bpy) 코드를 작업 큐로 안전하게 실행·저장합니다.
 
----
-
-## ✨ 주요 기능
-
-1. **블렌더 MCP 컨트롤**:
-   - `execute_blender_code`: 파이썬 스크립트 실행 (오브젝트 생성/변형, 재질, 조명, 카메라, 렌더링).
-   - `get_scene_info`: 씬 내 오브젝트 및 재질 메타데이터 실시간 조회.
-   - `capture_viewport`: 현재 3D 뷰포트 화면을 캡처하여 AI에게 시각적 피드백 제공.
-   - 메인 스레드 안전성: `bpy.app.timers` 기반 작업 큐로 크래시 없는 안전한 실행.
-
-2. **다중 대화 세션 (Multi-Session)**:
-   - 새 채팅 세션 생성, 세션 이름 변경, 세션 히스토리 보관 및 삭제.
-   - SQLite 기반 경량 내장 DB (Python 표준 라이브러리, 제로 의존성).
-
-3. **멀티모달 이미지 지원**:
-   - 📷 안드로이드 갤러리 또는 카메라 사진 직접 첨부.
-   - 🖼️ 원클릭 뷰포트 스크린샷 캡처 및 프롬프트 첨부.
-   - VLM (비전 모델: Claude 3.5 Sonnet, GPT-4o, Gemini, Qwen2.5-VL 등)과 완벽 호환.
-
-4. **다양한 백엔드 & CLI 에이전트 지원**:
-   - **Termux Claude Code / agy CLI**: 표준 MCP stdio 브릿지(`mcp_bridge.py`) 및 SSE 엔드포인트 지원.
-   - **OpenRouter**: 최신 클로드, GPT, 딥시크 모델 연동.
-   - **NVIDIA NIM**: 초고속 추론 마이크로서비스 연동.
-   - **Local LLM**: Termux 내부 또는 로컬 네트워크의 Ollama, LM Studio, vLLM 연동.
-
-5. **AI 모델 및 추론 성능(Reasoning) 조절**:
-   - `reasoning_effort` (`None` / `Low` / `Medium` / `High` - o1, o3, DeepSeek R1).
-   - `thinking_budget` (Claude 3.7 Sonnet 확장 사고 토큰 예산).
-   - Temperature, System Prompt 실시간 커스텀.
-
-6. **ARM64 환경 100% 무설치 호환 (Zero Dependency)**:
-   - 외부 C-extension 빌드가 전혀 필요 없으며, 순수 파이썬 표준 라이브러리로 구축되어 PRoot Linux ARM64에서 즉시 실행됩니다.
+> ## ⚠️ 알림 (미완성 부분)
+> **Blender 안드로이드(비공식 빌드)에서 Termux 연동으로 Claude를 쓰려고 했지만 미완성입니다.**
+> 안드로이드 Blender(APK)는 앱 샌드박스 때문에 Termux에 설치된 `claude`를 직접 실행할 수 없어서, Termux에 중계 서버(`termux_agent.py`)를 띄워 연결하는 방식으로 만들었습니다. 코드와 설치 스크립트는 들어 있지만 **실제 안드로이드 기기에서 끝까지 동작하는 것은 확인하지 못했습니다.**
+> 현재 정상 동작을 확인한 환경은 **Windows PC의 Blender + PC에 설치된 Claude Code**입니다. Codex CLI, agy CLI, macOS/Linux는 코드만 작성했고 검증하지 못했습니다.
 
 ---
 
-## 🚀 빠른 시작 가이드 (Termux PRoot Linux)
+## 1. 용도
 
-### 1. 애드온 설치
-Termux PRoot 터미널에서 다음 명령을 실행합니다:
+- Blender 안에서 "이 사진처럼 모자를 만들어 줘" 같은 문장으로 3D 모델링·재질 작업을 AI에게 시킵니다.
+- AI가 만든 코드를 바로 실행하지 않고 **작업 큐**에 쌓아 순서대로 실행하고, 성공할 때마다 `.blend` / `.glb` / 뷰포트 이미지를 자동 저장합니다.
+- 작업 전에 **계획(Plan)을 먼저 검토**하고, 마음에 들면 실행하거나 계속 수정할 수 있습니다.
 
-```bash
-cd ~/
-# 저장소 복제 (또는 워크스페이스에서 복사)
-git clone https://<your-repo>/mcp-chat-for-blender.git
-cd mcp-chat-for-blender
+## 2. 주요 기능 요약
 
-# 자동 설치 스크립트 실행 (Blender 애드온 경로로 심볼릭 링크 생성)
-chmod +x install_termux.sh
-./install_termux.sh
+| 구분 | 내용 |
+|---|---|
+| **AI 엔진** | Claude Code(기본), Codex CLI, agy CLI, Direct API(OpenRouter · NVIDIA NIM · 로컬 Ollama · 사용자 지정) |
+| **모델/추론 설정** | N패널에서 엔진별 모델(드롭다운 + 직접 입력)과 추론 성능 선택 |
+| **모드** | Chat(대화·즉시 실행) / Plan(계획 수립 후 검토) / Auto(계획 + 자동 실행) |
+| **Plan 검토** | 계획이 나오면 **실행 · 계속 계획 · 취소** 버튼으로 선택 |
+| **작업 큐** | 등록·수정·삭제·순서 변경(▲▼)·재시도·복제, 전역 딜레이(기본 60초), 하나의 지시 = 하나의 큐 작업 |
+| **자동 저장** | 작업 성공 시 `.blend`(리소스 패킹) + `.glb` + 뷰포트 PNG, 저장 위치 지정 가능 |
+| **채팅** | 세션 탭 최대 3개, 멀티라인 히스토리(스크롤), 대화 압축·초기화, 메시지 복사 |
+| **이미지 첨부** | 로컬 이미지 / 뷰포트 스냅샷 최대 3장(작은 미리보기). AI가 참고해서 제작 |
+| **프롬프트 확인** | 전송 전 **미리보기**, 전송 후 **실제 전송된 프롬프트**(Auto는 AI 계획 포함) 보기 |
+| **사용자 작업 지침** | "베벨은 2단계; 베벨 면에 검은색 버텍스 컬러 적용" 같은 지침을 모든 작업에 자동 적용 |
+| **기본 안전 규칙** | 요청하지 않은 조명·카메라 추가 금지, 기존 오브젝트 보존, 새 컬렉션에 배치, 렌더링 준비까지만 수행 |
+| **API 키 보안** | 키/토큰을 암호화해 애드온 폴더에 저장(애드온 삭제 시 함께 삭제) |
+| **MCP 서버** | Blender 안에서 MCP/웹 서버 실행. Claude Code 등이 `execute_blender_code`, `get_scene_info`, `capture_viewport` 도구로 Blender를 직접 조종 |
+| **웹 채팅 UI** | 브라우저(PC·모바일)에서도 같은 세션/큐 사용 |
+| **다국어** | 한국어 · English · 中文 · 日本語 |
+| **Blender 지원** | 3.x 이상 (MCP를 지원하는 AI 클라이언트면 버전 무관하게 연결 가능, 전 버전 검증은 미완) |
+
+## 3. 설치
+
+1. [Releases](.) 또는 `package_addon.py`로 만든 **`mcp-chat-for-blender.zip`** 을 준비합니다.
+   - 직접 만들기: `python package_addon.py` → `Z:\App\mcp-chat-for-blender.zip` (경로는 스크립트에서 변경)
+2. Blender → **Edit › Preferences › Add-ons › Install from Disk…** → zip 선택 → 체크박스로 활성화
+3. 3D 뷰포트에서 **N 키 → `MCP Chat` 탭**
+4. (선택) Claude Code 연동: 애드온 설정의 **Claude Code MCP 자동 등록** 클릭 후 PC에 `claude` CLI 설치
+
+### 지원 Blender 버전
+
+| 버전 | 상태 |
+|---|---|
+| Blender 3.x | 지원(애드온 최소 버전 3.0). 동작하는 것으로 보임 |
+| Blender 4.x 이상 | 지원 |
+| 안드로이드 Blender(비공식) | 실험적 — 위 알림 참고 |
+
+- 외부 AI가 **MCP(Model Context Protocol)** 로 Blender에 접속하는 구조라서, MCP를 지원하는 AI 클라이언트라면 Blender 버전과 관계없이 연결할 수 있습니다.
+- 다만 **모든 버전에서 검증한 것은 아닙니다.** 버전에 따라 일부 UI 동작이 다를 수 있습니다. GLB 내보내기는 Blender의 glTF 애드온이 켜져 있어야 합니다.
+- 파이썬 외부 패키지는 필요 없습니다(표준 라이브러리만 사용).
+
+## 4. 사용법
+
+### 4-1. 기본 흐름
+1. N패널 **MCP Chat** 탭에서 **Engine**(기본 Claude Code)과 **모델/추론 성능**을 고릅니다.
+2. 모드를 고릅니다. **기본값은 Auto**(계획 + 자동 실행)입니다. 실행 전에 계획을 확인하고 싶으면 **Plan**을 선택하세요.
+3. 프롬프트를 입력하고 **전송**합니다. (`+` 버튼으로 이미지 첨부, 📋 버튼으로 클립보드 붙여넣기)
+4. 결과/진행 상황은 채팅 히스토리에 표시됩니다. (`⏳ 작업 중…` 줄 → 완료 시 `✅`)
+
+![엔진·모델·추론 성능 선택](docs/images/engine-model.png)
+
+### 4-2. 채팅 히스토리
+- 긴 메시지는 여러 줄로 보이고, 마우스 휠/스크롤바로 이전 대화를 볼 수 있습니다.
+- 메시지 첫 줄의 ▼ 펼치기, 📋 복사, 📝 **전송된 프롬프트 보기** 버튼.
+- 헤더의 작은 버튼: 새로고침 / 대화 **압축**(오래된 대화를 요약 1개로) / **초기화** / 세션 삭제.
+
+![채팅 히스토리](docs/images/chat-history.png)
+
+### 4-3. Plan → 검토 → 실행
+1. **Plan** 모드로 전송하면 AI가 단계별 계획을 만듭니다.
+2. 입력창 위에 **계획 검토** 박스가 나타납니다.
+   - **실행**: 승인한 계획을 작업 큐 1건으로 등록해 실행
+   - **계속 계획**: 수정/추가 요청을 입력해 계획을 다시 작성
+   - **✖**: 계획 버리기
+
+### 4-4. 작업 큐
+- **Auto** 모드나 **큐 등록** 버튼으로 작업이 큐에 쌓입니다.
+- 항목마다 상태 아이콘(대기/실행중/완료/실패), ▲▼ 순서 변경, 수정, 재시도, 복제, 삭제가 있습니다.
+- 하단에서 **저장 위치**, **리소스 패킹**, **GLB 내보내기**를 설정합니다.
+
+![작업 큐](docs/images/task-queue.png)
+
+> 스크린샷은 개발 중 화면이며 버전에 따라 조금 다를 수 있습니다.
+
+### 4-5. 사용자 작업 지침
+입력창 아래 지침 칸에 적어 두면 **모든 작업**에 적용됩니다. 여러 개는 `;`로 구분합니다.
+예) `베벨은 2단계; 베벨 면에 검은색 버텍스 컬러 적용`
+
+### 4-6. 서버 / 웹 UI
+- 애드온 설정에서 서버를 시작하면 `http://127.0.0.1:8000` 에서 웹 채팅 UI를 쓸 수 있습니다.
+- Claude Code 등 외부 AI는 `http://127.0.0.1:8000/mcp` 로 Blender를 조종합니다.
+
+## 5. 안드로이드 + Termux 연동 (실험적 · 미완성)
+
+> 이 기능은 **미완성**입니다. 아래는 설계된 방식이며 실기기 검증은 되지 않았습니다.
+
+1. Blender(안드로이드)에서 서버 시작
+2. Termux에서: `curl -fsS http://127.0.0.1:8000/termux/setup.sh | bash`
+   - MCP 브릿지 다운로드, `claude`/`agy`/`codex` MCP 등록, **Termux Agent**(`127.0.0.1:8787`) 실행
+3. Blender 설정 › **Termux Agent**에 출력된 URL/토큰 입력 → **Agent 연결 테스트**
+4. Agent가 꺼졌다면 Termux에서 `bash ~/.config/blender_mcp_chat/start_agent.sh`
+
+PC의 Blender를 폰의 Termux에서 조종하려면 **LAN 접속 허용**을 켜고(토큰 인증), PC 방화벽에서 TCP 8000을 허용한 뒤 설정 화면의 **Termux 설치 명령 복사**를 사용합니다.
+
+## 6. 언어 지원
+
+| 언어 | 애드온(Blender) UI | 웹 UI |
+|---|---|---|
+| 한국어 | ✅ | ✅ |
+| English | ✅ | ❌ |
+| 中文 (简体) | ✅ | ❌ |
+| 日本語 | ✅ | ❌ |
+
+- 애드온 설정 맨 위 **Language** 에서 자동(Blender 언어) / 한 / 영 / 중 / 일을 선택합니다.
+- 번역은 `i18n.py`의 표 한 곳에서 수정·추가할 수 있습니다. 표에 없는 문구는 원문 그대로 표시됩니다.
+- 툴팁, 이전에 저장된 채팅 내용, AI 응답 언어, 웹 UI는 번역되지 않습니다.
+
+## 7. 구조
+
+```
+mcp-chat-for-blender/
+├─ __init__.py          Blender 애드온 본체: 패널·연산자·설정, 채팅/큐 UI
+├─ blender_bridge.py    Blender 메인 스레드 안전 실행, 씬 정보, 뷰포트 캡처, .blend/.glb 저장
+├─ task_queue.py        작업 큐 워커(순차 실행·진행 표시·자동 저장·들여쓰기 복구)
+├─ session_manager.py   SQLite 저장소(세션·메시지·큐·설정), 암호화 키 연동
+├─ llm_client.py        Direct API 클라이언트, Plan 프롬프트 생성
+├─ cli_runner.py        claude / codex / agy CLI 실행, 프롬프트 조립, Termux Agent 호출
+├─ guidelines.py        AI 기본 규칙 + 사용자 작업 지침(모든 엔진 공통)
+├─ secrets_store.py     API 키/토큰 암호화 금고 (DPAPI · openssl · 난독화 폴백)
+├─ i18n.py              UI 번역 표 (ko/en/zh/ja)
+├─ server.py            HTTP/MCP 서버, 웹 UI·REST API, 토큰 인증
+├─ mcp_handler.py       MCP JSON-RPC 도구 처리
+├─ mcp_bridge.py        stdio ↔ HTTP MCP 브릿지 (Claude Code 등에서 사용)
+├─ termux_agent.py      Termux에서 실행하는 CLI 중계 서버
+├─ install_termux.sh    PRoot 환경 설치 스크립트
+├─ package_addon.py     배포용 zip 패키징
+├─ static/              웹 채팅 UI (index.html · app.js · style.css)
+└─ docs/images/         README 스크린샷
 ```
 
-### 2. 블렌더에서 애드온 활성화
-1. 블렌더를 실행합니다 (`blender`).
-2. 상단 메뉴에서 **Edit > Preferences > Add-ons** 로 이동합니다.
-3. 검색창에 `MCP Chat`을 검색한 뒤 체크박스를 켭니다.
-4. 3D 뷰포트 우측의 **N-패널(사이드바) > MCP Chat** 탭을 열면 서버 상태가 `Online (Port 8000)`으로 표시됩니다.
+데이터 위치: `~/.config/blender_mcp_chat/` (대화 DB, 저장된 .blend/.glb/이미지). 암호화된 키는 애드온 폴더 안 `.vault/`에 있습니다.
+
+## 8. 보안 메모
+- API 키·토큰은 암호화 저장되며 웹 API는 키를 돌려주지 않습니다.
+- LAN 접속은 기본 꺼짐이며, 켜면 Bearer 토큰이 필요합니다. 로컬 접속도 Origin/Host를 검사합니다.
+- 이 애드온은 AI가 만든 **파이썬 코드를 Blender에서 실행**합니다. 중요한 작업 파일은 백업하고 신뢰하는 AI/네트워크에서만 사용하세요.
+
+## 9. 알려진 한계
+- 안드로이드 Termux 연동 미완성(위 알림 참고)
+- Blender 입력창에서 **한글 입력 중 띄어쓰기**가 안 되는 문제가 보고됨 (Blender/IME 쪽 문제로 추정). 웹 채팅 UI 입력이나 붙여넣기 버튼으로 우회 가능
+- CLI 엔진(Claude/Codex/agy)은 매 요청이 새 대화로 실행됨(이전 대화 이어쓰기 없음)
+- 진행 표시는 글자 기반이며 회전 애니메이션은 없음
+
+## 10. 버전 규칙
+
+- 현재 버전: **0.8**
+- **기능 추가**: 0.1 단위로 올림 (0.8 → 0.9 → 1.0 …)
+- **버그 수정**: 0.0.1 단위로 올림 (0.8.1 → 0.8.2 … 최대 0.8.999)
+- Blender `bl_info`에는 `(0, 8, 0)` 형태의 튜플로 기록됩니다. 변경 내역은 [CHANGELOG.md](CHANGELOG.md) 참고.
+
+## 11. 작성
+- 작성: **refleAct**
+- AI 협업: Anthropic **Claude Code**와 함께 설계·구현
+- 비공식 프로젝트이며 Blender Foundation, Anthropic, OpenAI, Google과 무관합니다.
+
+## 12. 라이선스
+
+**MIT 기반 + 출처 표기 유지 조건**
+
+- ✅ **소스 수정** 가능
+- ✅ **재배포** 가능 (수정본 포함, 상업적 이용 포함)
+- ⚠️ **저작권 표기와 출처는 변경·삭제하지 마세요.** 수정·배포할 때 원 저작자(작성: refleAct)와 이 라이선스 문구를 그대로 유지해야 합니다.
+- 소프트웨어는 **있는 그대로** 제공되며, 사용으로 인한 문제(작업 파일 손상 등)에 책임지지 않습니다.
+
+전문은 [LICENSE](LICENSE) 파일을 참고하세요.
 
 ---
 
-## 📱 안드로이드 모바일 사용 방법 (웹 UI / PWA)
+## English summary
 
-블렌더가 실행 중인 상태에서 안드로이드의 브라우저(크롬, 삼성 인터넷 등)를 엽니다:
+**MCP Chat for Blender** lets you chat with AI (Claude Code, Codex CLI, agy CLI, OpenRouter/NVIDIA NIM/Ollama) in Blender's N-panel to build 3D models. AI-generated bpy code runs through a safe task queue with auto-save (`.blend` with packed resources, `.glb`, viewport PNG). Includes plan review (run / refine), prompt preview, user rules, encrypted API-key storage, and UI languages ko/en/zh/ja.
 
-👉 **접속 주소**: `http://127.0.0.1:8000`
+> **Notice:** Using Claude through Termux from the unofficial Blender for Android is **incomplete and unverified**. Verified setup: Blender on Windows PC with Claude Code on the same PC.
 
-- **화면 분할(Split Screen) / 삼성 DeX**: 상단/좌측에 블렌더, 하단/우측에 웹 채팅창을 띄워놓고 작업하면 최적입니다.
-- **홈 화면에 추가**: 브라우저 메뉴에서 "홈 화면에 추가"를 누르면 앱처럼 독립된 창으로 실행할 수 있습니다.
-- **사진 첨부**: 하단 `📷` 버튼을 누르면 폰 갤러리나 카메라가 열려 사진을 첨부할 수 있습니다.
-- **뷰포트 캡처**: 하단 `🖼️` 버튼을 누르면 현재 블렌더 화면을 즉시 캡처하여 첨부합니다.
-
----
-
-## ⚡ Termux Claude Code / agy CLI 연동
-
-Termux CLI 환경에서 Claude Code를 사용하여 블렌더를 조종하려면:
-
-### 방법 1: `claude mcp add` 명령어 사용
-```bash
-claude mcp add blender python3 ~/mcp-chat-for-blender/mcp_bridge.py
-```
-
-### 방법 2: `~/.claude.json` 직접 설정
-`~/.claude.json` 파일의 `mcpServers` 항목에 아래 내용을 추가합니다:
-
-```json
-{
-  "mcpServers": {
-    "blender": {
-      "command": "python3",
-      "args": ["/root/mcp-chat-for-blender/mcp_bridge.py"]
-    }
-  }
-}
-```
-
-이제 Termux에서 `claude`를 실행하면 블렌더 MCP 도구(`execute_blender_code`, `get_scene_info`, `capture_viewport`)를 자동으로 인식하여 터미널에서 대화하며 블렌더를 조종할 수 있습니다!
-
----
-
-## ⚙️ REST API & MCP 엔드포인트 명세
-
-| 엔드포인트 | 메서드 | 설명 |
-| :--- | :---: | :--- |
-| `/` | `GET` | 모바일 반응형 웹 UI 서빙 |
-| `/api/sessions` | `GET` / `POST` | 세션 목록 조회 및 신규 세션 생성 |
-| `/api/sessions/<id>` | `GET` / `PATCH` / `DELETE` | 세션 상세, 설정 변경, 삭제 |
-| `/api/sessions/<id>/messages` | `POST` | 메시지 전송 및 LLM 에이전트 자율 도구 실행 |
-| `/api/blender/viewport` | `GET` | 3D 뷰포트 스크린샷 캡처 (Base64) |
-| `/api/blender/scene` | `GET` | 현재 씬의 오브젝트 및 재질 요약 정보 |
-| `/api/settings` | `GET` / `POST` | LLM 프로바이더 키, 모델, 추론 강도 설정 |
-| `/mcp` | `POST` | MCP JSON-RPC 2.0 엔드포인트 |
-| `/sse` | `GET` | MCP SSE 스트림 엔드포인트 |
+License: MIT-based — modify and redistribute freely, but **do not remove or alter the copyright/attribution notice**. See [LICENSE](LICENSE).
