@@ -11,7 +11,7 @@ import urllib.error
 import ssl
 from typing import List, Dict, Any, Optional, Callable
 from blender_bridge import bridge
-from guidelines import GUIDELINES as _GUIDELINES
+from guidelines import get_guidelines as _get_guidelines
 
 
 def _user_rules_block() -> str:
@@ -75,7 +75,7 @@ def build_plan_system() -> str:
 Your role is PLAN MODE: Decompose the user's 3D modeling/rendering request into clean, sequential, executable steps.
 For each step, provide clean, self-contained Blender Python code (using bpy).
 
-""" + _GUIDELINES + _user_rules_block() + """
+""" + _get_guidelines() + _user_rules_block() + """
 
 You MUST output ONLY a valid JSON object matching this schema (no surrounding text or commentary):
 {
@@ -101,7 +101,7 @@ def compose_plan_messages(user_prompt: str, images=None):
     user_content = text
     imgs = [u for u in (images or []) if u]
     if imgs:
-        user_content = [{"type": "text", "text": text + " (첨부 이미지를 참고하여 계획을 세우세요)"}]
+        user_content = [{"type": "text", "text": text + " (Use the attached images as reference when planning.)"}]
         user_content += [{"type": "image_url", "image_url": {"url": u}} for u in imgs]
     return [
         {"role": "system", "content": build_plan_system()},

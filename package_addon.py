@@ -30,6 +30,7 @@ def package():
         "guidelines.py",
         "i18n.py",
         "secrets_store.py",
+        "updater.py",
         "termux_agent.py",
         "llm_client.py",
         "mcp_bridge.py",

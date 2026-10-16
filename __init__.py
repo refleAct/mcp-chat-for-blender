@@ -17,6 +17,7 @@ import base64
 import json
 import re
 import textwrap
+import unicodedata
 import uuid
 import tempfile
 import bpy
@@ -36,6 +37,7 @@ if addon_dir not in sys.path:
 
 # Forcibly reload submodules on Blender 'Reload Scripts' (bpy.ops.script.reload)
 _submodules = [
+    "updater",
     "secrets_store",
     "i18n",
     "guidelines",
@@ -62,6 +64,8 @@ import cli_runner
 import llm_client
 import i18n
 import secrets_store
+import updater
+import guidelines
 import shutil
 from i18n import tr
 
@@ -439,6 +443,43 @@ class MCPChatPreferences(AddonPreferences):
 
         layout.prop(self, "ui_language")
 
+        # 업데이트 (GitHub Releases)
+        box_up = layout.box()
+        box_up.label(text=f"버전: v{_current_version_str()}  (GitHub Releases)", icon='URL')
+        ust = updater.state
+        row_up = box_up.row(align=True)
+        row_up.enabled = not (ust["checking"] or ust["installing"])
+        row_up.operator("mcpchat.check_update", text="업데이트 확인", icon='FILE_REFRESH')
+        info = ust.get("info")
+        if ust["checking"]:
+            box_up.label(text="확인 중…", icon='TIME')
+        elif ust["installing"]:
+            box_up.label(text="설치 중…", icon='TIME')
+        elif info:
+            if not info.get("ok"):
+                box_up.label(text=info.get("error", ""), icon='ERROR')
+            elif info.get("newer"):
+                box_up.label(text=f"새 버전 v{info['latest']} 이(가) 있습니다", icon='CHECKMARK')
+                row_in = box_up.row(align=True)
+                row_in.scale_y = 1.2
+                row_in.operator("mcpchat.install_update", text="업데이트 설치", icon='IMPORT')
+            else:
+                box_up.label(text="최신 버전입니다", icon='CHECKMARK')
+        if ust.get("message"):
+            box_up.label(text=ust["message"], icon='INFO')
+
+        # AI 실행 규칙 (Blender Execution Rules) 편집
+        box_rules = layout.box()
+        is_custom = bool((session_mgr.get_setting("custom_guidelines", "") or "").strip())
+        box_rules.label(text="AI 실행 규칙 (Blender Execution Rules)", icon='TEXT')
+        box_rules.label(text="사용자 수정 규칙 사용 중" if is_custom else "기본 규칙 사용 중",
+                        icon='CHECKMARK' if is_custom else 'DOT')
+        row_ru = box_rules.row(align=True)
+        row_ru.operator("mcpchat.edit_rules", text="규칙 편집", icon='GREASEPENCIL')
+        row_ru.operator("mcpchat.save_rules", text="편집 내용 저장", icon='FILE_TICK')
+        row_ru.operator("mcpchat.reset_rules", text="기본값 복원", icon='LOOP_BACK')
+        box_rules.label(text="Text Editor에서 수정한 뒤 '편집 내용 저장'을 누르세요. AI에 그대로 전달되므로 영어 권장", icon='INFO')
+
         box_sec = layout.box()
         enc = {"DPAPI1": "Windows DPAPI", "OSSL1": "AES-256 (openssl)", "OBF1": "난독화 (약함)"}.get(secrets_store.backend_name(), "?")
         box_sec.label(text=f"API 키/토큰 보안 저장소: {enc}", icon='LOCKED' if not secrets_store.is_weak() else 'ERROR')
@@ -446,14 +487,6 @@ class MCPChatPreferences(AddonPreferences):
             box_sec.label(text="이 환경에는 시스템 암호화가 없어 키가 약하게만 보호됩니다 (openssl 설치 권장)", icon='INFO')
         box_sec.label(text="키는 애드온 폴더 안에 암호화되어 저장되며, 애드온을 삭제하면 함께 삭제됩니다", icon='INFO')
         box_sec.operator("mcpchat.wipe_all_data", text="모든 데이터 삭제 (대화/키/출력)", icon='TRASH')
-        layout.separator()
-
-        # 0. User Rules
-        box_rules = layout.box()
-        box_rules.label(text="사용자 작업 지침 (모든 AI 작업에 적용)", icon='TEXT')
-        box_rules.prop(self, "user_rules", text="")
-        box_rules.label(text="여러 개는 ; 로 구분. 예) 베벨은 2단계; 베벨 면에 검은색 버텍스 컬러 적용", icon='INFO')
-
         layout.separator()
 
         # 1. Direct API Settings Section
@@ -551,6 +584,20 @@ class MCPChatPreferences(AddonPreferences):
         col.operator("mcpchat.setup_claude_cli", text="Claude Code MCP 자동 등록", icon='CONSOLE')
         col.operator("mcpchat.setup_codex_cli", text="Codex CLI MCP 자동 등록", icon='CONSOLE')
         col.operator("mcpchat.setup_agy_cli", text="agy CLI MCP 자동 등록", icon='SETTINGS')
+
+        layout.separator()
+
+        # 5. 출처 / 참조 (Credits)
+        box_cr = layout.box()
+        box_cr.label(text="출처 / 참조", icon='INFO')
+        box_cr.label(text="MCP (Model Context Protocol): Anthropic 공개 사양, 이 애드온에서 직접 구현")
+        box_cr.label(text="CLI: Claude Code (Anthropic) · Codex (OpenAI) · agy (Google)")
+        box_cr.label(text="Blender API (bpy) · glTF-Blender-IO (Khronos) · ambientCG (CC0)")
+        row_cr = box_cr.row(align=True)
+        o1 = row_cr.operator("mcpchat.open_url", text="MCP 사양", icon='URL')
+        o1.url = "https://modelcontextprotocol.io"
+        o2 = row_cr.operator("mcpchat.open_url", text="전체 출처 (README)", icon='URL')
+        o2.url = "https://github.com/refleAct/mcp-chat-for-blender#11-출처-및-참조-credits"
 
 
 # ==============================================================================
@@ -686,10 +733,40 @@ def sync_messages_to_ui(scene, session_id):
     tag_redraw_all()
 
 
+def _cell_width(ch):
+    return 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
+
+
+def wrap_cells(text, cells):
+    """표시 폭 기준 줄바꿈: 한글/한자/전각은 2칸, 영문/숫자는 1칸. 가능하면 공백에서 줄을 나눈다.
+    라벨이 레이아웃보다 넓어 Blender가 중간을 '...'로 줄이는 것을 막는다."""
+    lines, cur, cur_w, last_space = [], "", 0, -1
+    for ch in text:
+        w = _cell_width(ch)
+        if cur_w + w > cells and cur:
+            if last_space > 0:
+                lines.append(cur[:last_space].rstrip())
+                cur = cur[last_space:].lstrip() + ch
+                cur_w = sum(_cell_width(c) for c in cur)
+            else:
+                lines.append(cur)
+                cur, cur_w = ch, w
+            last_space = -1
+            continue
+        if ch == " ":
+            last_space = len(cur)
+        cur += ch
+        cur_w += w
+    if cur:
+        lines.append(cur)
+    return lines or [""]
+
+
 def rebuild_lines(scene, scroll_to_end=False, sid=None):
     """메시지 -> 줄 단위 행으로 변환. UIList 네이티브 스크롤바/휠 스크롤을 사용하기 위함."""
     lines = scene.mcpchat_lines
     lines.clear()
+    cells = max(16, getattr(scene, "mcpchat_wrap_cells", 34))
     for idx, m in enumerate(scene.mcpchat_messages):
         suffix = f" [img {m.img_count}]" if m.img_count else ""
         expandable = len(m.full_text) > len(m.content) + 3
@@ -697,10 +774,10 @@ def rebuild_lines(scene, scroll_to_end=False, sid=None):
             chunks = []
             for ln in m.full_text.splitlines():
                 if ln.strip():
-                    chunks.extend(textwrap.wrap(ln, LINE_WRAP_WIDTH) or [ln])
+                    chunks.extend(wrap_cells(ln, cells))
             chunks = chunks[:MAX_EXPANDED_LINES] + (["…"] if len(chunks) > MAX_EXPANDED_LINES else [])
         else:
-            chunks = textwrap.wrap(m.content + suffix, LINE_WRAP_WIDTH) or [""]
+            chunks = wrap_cells(m.content + suffix, cells)
             if len(chunks) > SUMMARY_MAX_LINES:
                 chunks = chunks[:SUMMARY_MAX_LINES]
                 chunks[-1] = chunks[-1].rstrip() + " …"
@@ -724,7 +801,7 @@ def rebuild_lines(scene, scroll_to_end=False, sid=None):
     if active:
         transient.append(tr(f"⏳ 작업 진행중: {active.get('title', '')} - {task_queue.progress or '실행 중'}"))
     for text in transient:
-        for n, chunk in enumerate(textwrap.wrap(text, LINE_WRAP_WIDTH) or [text]):
+        for n, chunk in enumerate(wrap_cells(text, cells)):
             it = lines.add()
             it.role = 'assistant'
             it.text = chunk
@@ -1009,8 +1086,8 @@ def build_refine_prompt(pending, new_request):
     nl = chr(10)
     return (
         f"{pending.get('prompt', '')}" + nl + nl
-        + "[이전에 제안한 계획]" + nl + f"{pending.get('plan_text', '')}" + nl + nl
-        + "[사용자의 수정/추가 요청 - 이를 반영하여 계획을 다시 작성]" + nl + new_request
+        + "[Previously proposed plan]" + nl + f"{pending.get('plan_text', '')}" + nl + nl
+        + "[User change/addition request - rewrite the plan to reflect it]" + nl + new_request
     )
 
 
@@ -1034,7 +1111,7 @@ class MCPCHAT_OT_plan_execute(TOp):
         else:
             nl = chr(10)
             payload = {
-                "prompt": pend.get("prompt", "") + nl + nl + "[승인된 계획 - 이 계획 그대로 실행하세요]" + nl + pend.get("plan_text", ""),
+                "prompt": pend.get("prompt", "") + nl + nl + "[Approved plan - execute exactly this plan]" + nl + pend.get("plan_text", ""),
                 "backend": pend.get("backend", "CLAUDE"),
                 "images": pend.get("images") or [],
             }
@@ -1152,7 +1229,7 @@ class MCPCHAT_OT_reload_addon(TOp):
     def execute(self, context):
         try:
             import importlib
-            for _mod in ["secrets_store", "i18n", "guidelines", "session_manager", "blender_bridge", "task_queue", "cli_runner", "llm_client", "server", "mcp_handler"]:
+            for _mod in ["updater", "secrets_store", "i18n", "guidelines", "session_manager", "blender_bridge", "task_queue", "cli_runner", "llm_client", "server", "mcp_handler"]:
                 if _mod in sys.modules:
                     try:
                         importlib.reload(sys.modules[_mod])
@@ -1642,6 +1719,146 @@ class MCPCHAT_OT_regenerate_token(TOp):
         return {'FINISHED'}
 
 
+def _current_version() -> tuple:
+    return tuple(bl_info["version"])
+
+
+def _current_version_str() -> str:
+    return updater.format_version(_current_version())
+
+
+def _tag_prefs_redraw():
+    def _t():
+        try:
+            for win in bpy.context.window_manager.windows:
+                for area in win.screen.areas:
+                    area.tag_redraw()
+        except Exception:
+            pass
+        return None
+    try:
+        bpy.app.timers.register(_t, first_interval=0.1)
+    except Exception:
+        pass
+
+
+RULES_TEXT_NAME = "MCP Execution Rules"
+
+
+class MCPCHAT_OT_edit_rules(TOp):
+    """현재 적용 중인 Blender Execution Rules를 텍스트 창에서 편집"""
+    bl_idname = "mcpchat.edit_rules"
+    bl_label = "규칙 편집"
+
+    def execute(self, context):
+        current = guidelines.get_guidelines().rstrip(chr(10))
+        if show_text_block(context, RULES_TEXT_NAME, current):
+            self.report({'INFO'}, "텍스트 창에서 규칙을 수정한 뒤 '편집 내용 저장'을 누르세요.")
+        else:
+            self.report({'WARNING'}, f"텍스트 에디터를 열 수 없습니다. Text Editor에서 '{RULES_TEXT_NAME}'를 선택해 수정하세요.")
+        return {'FINISHED'}
+
+
+class MCPCHAT_OT_save_rules(TOp):
+    """텍스트 창에서 수정한 규칙을 저장 (기본 규칙과 같으면 기본값으로 되돌림)"""
+    bl_idname = "mcpchat.save_rules"
+    bl_label = "편집 내용 저장"
+
+    def execute(self, context):
+        txt = bpy.data.texts.get(RULES_TEXT_NAME)
+        if txt is None:
+            self.report({'WARNING'}, "먼저 '규칙 편집'을 눌러 규칙을 불러오세요.")
+            return {'CANCELLED'}
+        body = txt.as_string().strip()
+        if not body or body == guidelines.GUIDELINES.strip():
+            session_mgr.set_setting("custom_guidelines", "")
+            self.report({'INFO'}, "기본 규칙을 사용합니다.")
+        else:
+            session_mgr.set_setting("custom_guidelines", body)
+            self.report({'INFO'}, "수정한 규칙이 저장되었습니다. 이후 모든 요청에 적용됩니다.")
+        return {'FINISHED'}
+
+
+class MCPCHAT_OT_reset_rules(TOp):
+    """수정한 규칙을 버리고 기본 규칙으로 복원"""
+    bl_idname = "mcpchat.reset_rules"
+    bl_label = "기본값 복원"
+
+    def execute(self, context):
+        session_mgr.set_setting("custom_guidelines", "")
+        txt = bpy.data.texts.get(RULES_TEXT_NAME)
+        if txt is not None:
+            txt.clear()
+            txt.write(guidelines.GUIDELINES.rstrip(chr(10)))
+        self.report({'INFO'}, "기본 규칙으로 복원했습니다.")
+        return {'FINISHED'}
+
+
+class MCPCHAT_OT_check_update(TOp):
+    """GitHub Releases에서 최신 버전 확인"""
+    bl_idname = "mcpchat.check_update"
+    bl_label = "업데이트 확인"
+
+    def execute(self, context):
+        if updater.state["checking"]:
+            return {'CANCELLED'}
+        updater.state.update({"checking": True, "message": "", "installed": False})
+
+        def _work():
+            try:
+                updater.state["info"] = updater.check_latest(_current_version())
+            finally:
+                updater.state["checking"] = False
+                _tag_prefs_redraw()
+
+        threading.Thread(target=_work, daemon=True).start()
+        return {'FINISHED'}
+
+
+class MCPCHAT_OT_install_update(TOp):
+    """최신 릴리즈를 내려받아 설치 (설치 후 Blender 재시작 필요)"""
+    bl_idname = "mcpchat.install_update"
+    bl_label = "업데이트 설치"
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event)
+
+    def execute(self, context):
+        info = updater.state.get("info") or {}
+        if not info.get("newer") or updater.state["installing"]:
+            return {'CANCELLED'}
+        updater.state.update({"installing": True, "message": ""})
+        url = info.get("asset_url", "")
+
+        def _work():
+            try:
+                ok, msg = updater.install(url, _current_version())
+                updater.state["message"] = msg
+                updater.state["installed"] = ok
+                if ok:
+                    updater.state["info"] = None
+            finally:
+                updater.state["installing"] = False
+                _tag_prefs_redraw()
+
+        threading.Thread(target=_work, daemon=True).start()
+        self.report({'INFO'}, "업데이트를 내려받는 중입니다.")
+        return {'FINISHED'}
+
+
+class MCPCHAT_OT_open_url(TOp):
+    """웹 브라우저에서 주소 열기 (https만 허용)"""
+    bl_idname = "mcpchat.open_url"
+    bl_label = "열기"
+
+    url: StringProperty()
+
+    def execute(self, context):
+        if self.url.startswith("https://"):
+            webbrowser.open(self.url)
+        return {'FINISHED'}
+
+
 class MCPCHAT_OT_delete_secret(TOp):
     """저장된 키/토큰 삭제"""
     bl_idname = "mcpchat.delete_secret"
@@ -2034,6 +2251,7 @@ class MCPCHAT_PT_chat_panel(Panel):
                 )
                 row_rows = box_history.row(align=True)
                 row_rows.alignment = 'RIGHT'
+                row_rows.prop(scene, "mcpchat_wrap_cells")
                 row_rows.prop(scene, "mcpchat_history_rows", text="표시 줄 수")
 
             layout.separator(factor=0.5)
@@ -2331,6 +2549,12 @@ classes = (
     MCPCHAT_OT_edit_user_rules,
     MCPCHAT_OT_copy_termux_command,
     MCPCHAT_OT_regenerate_token,
+    MCPCHAT_OT_edit_rules,
+    MCPCHAT_OT_save_rules,
+    MCPCHAT_OT_reset_rules,
+    MCPCHAT_OT_check_update,
+    MCPCHAT_OT_install_update,
+    MCPCHAT_OT_open_url,
     MCPCHAT_OT_delete_secret,
     MCPCHAT_OT_wipe_all_data,
     MCPCHAT_OT_open_preferences,
@@ -2481,6 +2705,10 @@ def register():
         name="저장 위치", subtype='DIR_PATH', default="",
         description="자동 저장 폴더 (비우면 기본 위치). 하위에 blends / glb / renders 폴더가 만들어집니다",
         update=_sync_scene_setting("output_dir"))
+    bpy.types.Scene.mcpchat_wrap_cells = IntProperty(
+        name="줄 너비", description="한 줄에 들어가는 글자 폭 (한글 2칸·영문 1칸). 말줄임(...)이 보이면 줄이세요",
+        default=34, min=16, max=100,
+        update=lambda self, ctx: rebuild_lines(self))
     bpy.types.Scene.mcpchat_history_rows = IntProperty(
         name="표시 줄 수", description="채팅 히스토리에 한 번에 보이는 줄 수 (넘치면 스크롤)", default=10, min=4, max=40)
     bpy.types.Scene.mcpchat_queue_delay = IntProperty(
@@ -2521,7 +2749,7 @@ def unregister():
         'mcpchat_claude_model', 'mcpchat_claude_effort', 'mcpchat_agy_model',
         'mcpchat_agy_effort', 'mcpchat_codex_model', 'mcpchat_codex_effort',
         'mcpchat_auto_save_blend', 'mcpchat_auto_save_image', 'mcpchat_plan_refine',
-        'mcpchat_auto_save_pack', 'mcpchat_auto_save_glb', 'mcpchat_output_dir',
+        'mcpchat_auto_save_pack', 'mcpchat_auto_save_glb', 'mcpchat_output_dir', 'mcpchat_wrap_cells',
         'mcpchat_claude_model_sel', 'mcpchat_codex_model_sel', 'mcpchat_agy_model_sel'
     ]:
         if hasattr(bpy.types.Scene, prop):

@@ -336,10 +336,10 @@ class CLIRunner:
 
     def build_guidelines(self) -> str:
         try:
-            from guidelines import GUIDELINES
+            from guidelines import get_guidelines
         except ImportError:
-            from .guidelines import GUIDELINES
-        return GUIDELINES + self._user_block() + "\n"
+            from .guidelines import get_guidelines
+        return get_guidelines() + self._user_block() + "\n"
 
     def find_cli(self, cli_type: str) -> Optional[str]:
         return {
@@ -381,7 +381,7 @@ class CLIRunner:
         """CLI 엔진에 실제로 전달되는 최종 프롬프트 (미리보기/기록/실행이 같은 함수를 사용)."""
         if image_paths:
             nl0 = chr(10)
-            prompt = (prompt + nl0 + nl0 + "[첨부 이미지 - 작업 전에 반드시 열어서 확인하고 참고하세요]" + nl0
+            prompt = (prompt + nl0 + nl0 + "[Attached images - open and study them before starting, and use them as reference]" + nl0
                       + nl0.join("- " + p for p in image_paths))
         plan_text = (
             guidelines

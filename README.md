@@ -29,6 +29,8 @@ Claude Code · Codex · agy CLI · OpenRouter 등 여러 AI 엔진을 N패널 �
 | **채팅** | 세션 탭 최대 3개, 멀티라인 히스토리(스크롤), 대화 압축·초기화, 메시지 복사 |
 | **이미지 첨부** | 로컬 이미지 / 뷰포트 스냅샷 최대 3장(작은 미리보기). AI가 참고해서 제작 |
 | **프롬프트 확인** | 전송 전 **미리보기**, 전송 후 **실제 전송된 프롬프트**(Auto는 AI 계획 포함) 보기 |
+| **AI 실행 규칙 편집** | 기본 규칙(Blender Execution Rules)을 애드온 설정에서 직접 수정·복원 |
+| **자동 업데이트** | 애드온 설정에서 GitHub Releases 최신 버전 확인 후 설치 |
 | **사용자 작업 지침** | "베벨은 2단계; 베벨 면에 검은색 버텍스 컬러 적용" 같은 지침을 모든 작업에 자동 적용 |
 | **기본 안전 규칙** | 요청하지 않은 조명·카메라 추가 금지, 기존 오브젝트 보존, 새 컬렉션에 배치, 렌더링 준비까지만 수행 |
 | **API 키 보안** | 키/토큰을 암호화해 애드온 폴더에 저장(애드온 삭제 시 함께 삭제) |
@@ -166,12 +168,36 @@ mcp-chat-for-blender/
 - **버그 수정**: 0.0.1 단위로 올림 (0.8.1 → 0.8.2 … 최대 0.8.999)
 - Blender `bl_info`에는 `(0, 8, 0)` 형태의 튜플로 기록됩니다. 변경 내역은 [CHANGELOG.md](CHANGELOG.md) 참고.
 
-## 11. 작성
+## 11. 출처 및 참조 (Credits)
+
+이 프로젝트는 아래 사양·도구·서비스를 **참조하거나 외부 프로그램으로 호출**합니다. 이름과 상표는 각 소유자에게 있으며, 이 프로젝트는 이들과 제휴 관계가 아닙니다.
+
+| 항목 | 이 프로젝트에서의 사용 | 출처 |
+|---|---|---|
+| **MCP (Model Context Protocol)** | Blender 제어용 서버(`mcp_handler.py`)·stdio 브릿지(`mcp_bridge.py`)를 **공개 사양(프로토콜 버전 2024-11-05)을 보고 직접 구현**. 외부 MCP SDK 코드는 포함하지 않음 | Anthropic · <https://modelcontextprotocol.io> |
+| **Claude Code** | 외부 CLI로 실행 (`claude -p`, `--model`, `--effort`, `--permission-mode`) | Anthropic · <https://docs.claude.com/en/docs/claude-code> |
+| **Codex CLI** | 외부 CLI로 실행 (`codex exec`, `-m`, `-i`, `-c model_reasoning_effort`), `~/.codex/config.toml` MCP 등록 | OpenAI · <https://github.com/openai/codex> |
+| **agy CLI** | 외부 CLI로 실행 (Antigravity) | Google Antigravity |
+| **OpenRouter / NVIDIA NIM / Ollama · LM Studio** | Direct API 모드 (OpenAI 호환 Chat Completions 형식) | <https://openrouter.ai> · <https://build.nvidia.com> · <https://ollama.com> |
+| **Blender Python API (`bpy`)** | 애드온 UI, 씬 제어, 저장 | Blender Foundation · <https://docs.blender.org/api/current/> (GPL) |
+| **glTF 2.0 / glTF-Blender-IO** | `.glb` 내보내기에 Blender 내장 glTF 애드온 호출 | Khronos Group · <https://github.com/KhronosGroup/glTF-Blender-IO> (Apache-2.0) |
+| **ambientCG** | AI 지침의 "AmbientCG 스타일 PBR 재질" 참조 (텍스처 파일은 포함하지 않음) | <https://ambientcg.com> (CC0) |
+| **Termux** | 안드로이드 연동 대상 환경 (실험적) | <https://termux.dev> |
+| **Windows DPAPI / OpenSSL** | API 키 암호화 저장 (Windows는 DPAPI, 그 외 `openssl enc -aes-256-cbc`) | Microsoft · <https://www.openssl.org> (Apache-2.0) |
+| **GitHub Releases API** | 애드온 업데이트 확인 | <https://docs.github.com/rest/releases> |
+| **Python 표준 라이브러리** | `http.server`, `sqlite3`, `urllib`, `zipfile` 등 (외부 패키지 번들 없음) | Python Software Foundation |
+
+- 외부 라이브러리/SDK 소스코드는 이 저장소에 **포함하지 않았습니다**(표준 라이브러리만 사용). 외부 서비스·CLI는 사용자가 직접 설치/가입해야 합니다.
+- 설계와 구현은 **Anthropic Claude Code** 와의 협업으로 작성되었습니다.
+- 이 애드온은 `bpy`를 사용하므로 Blender의 GPL과 **호환되는 라이선스(MIT 기반)** 로 배포합니다.
+- 출처에 빠졌거나 잘못된 항목은 이슈로 알려 주세요.
+
+## 12. 작성
 - 작성: **refleAct**
 - AI 협업: Anthropic **Claude Code**와 함께 설계·구현
 - 비공식 프로젝트이며 Blender Foundation, Anthropic, OpenAI, Google과 무관합니다.
 
-## 12. 라이선스
+## 13. 라이선스
 
 **MIT 기반 + 출처 표기 유지 조건**
 

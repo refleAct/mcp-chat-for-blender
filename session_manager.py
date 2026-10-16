@@ -18,8 +18,10 @@ except ImportError:  # loaded as a package submodule
 from typing import List, Dict, Any, Optional, Tuple
 
 try:
+    import guidelines as _g
     from guidelines import GUIDELINES, format_user_rules
 except ImportError:  # loaded as a package submodule
+    from . import guidelines as _g
     from .guidelines import GUIDELINES, format_user_rules
 
 DEFAULT_SYSTEM_PROMPT = """You are an expert 3D Artist and Blender Python automation assistant.
@@ -29,6 +31,11 @@ You have direct access to Blender tools via MCP / function calling:
 - capture_viewport: Capture the current 3D viewport to inspect the visual results.
 
 """ + GUIDELINES
+
+def build_default_system_prompt() -> str:
+    """기본 시스템 프롬프트 = 역할 설명 + (사용자 수정 가능한) Blender Execution Rules."""
+    return DEFAULT_SYSTEM_PROMPT.split("[Blender Execution Rules", 1)[0] + _g.get_guidelines()
+
 
 def get_safe_data_dir() -> str:
     """
@@ -379,12 +386,10 @@ class SessionManager:
                 session["messages"] = []
                 return session
 
-            # 이전 버전 기본 프롬프트를 사용하는 세션은 최신 지침으로 자동 갱신
+            # 기본 프롬프트 기반 세션은 항상 '현재 규칙'(사용자 수정 규칙 포함)으로 동적 생성
             sp = session.get("system_prompt") or ""
-            if "Critical Guidelines" in sp or (sp.startswith("You are an expert 3D Artist") and GUIDELINES not in sp):
-                conn.cursor().execute("UPDATE sessions SET system_prompt = ? WHERE id = ?", (DEFAULT_SYSTEM_PROMPT, session_id))
-                conn.commit()
-                session["system_prompt"] = DEFAULT_SYSTEM_PROMPT
+            if "Critical Guidelines" in sp or sp.startswith("You are an expert 3D Artist"):
+                session["system_prompt"] = build_default_system_prompt()
 
             # Fetch messages
             m_rows = conn.cursor().execute(
@@ -781,5 +786,6 @@ class SessionManager:
 
 # Global session manager instance
 session_mgr = SessionManager()
+_g.set_custom_provider(lambda: session_mgr.get_setting("custom_guidelines", ""))
 
 
