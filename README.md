@@ -41,7 +41,8 @@ Claude Code · Codex · agy CLI · OpenRouter 등 여러 AI 엔진을 N패널 �
 
 ## 3. 설치
 
-1. [Releases](.) 또는 `package_addon.py`로 만든 **`mcp-chat-for-blender.zip`** 을 준비합니다.
+1. [Releases](https://github.com/refleAct/mcp-chat-for-blender/releases)에서 **`mcp-chat-for-blender-vX.Y.Z.zip`** 을 내려받습니다.
+   - ⚠️ GitHub의 **"Source code (zip)" / "Download ZIP"은 사용하지 마세요.** 폴더 이름에 버전 점(`.`)이 들어가 Blender가 설치 후 `No module named 'mcp-chat-for-blender-0'` 오류를 냅니다. 반드시 Releases에 첨부된 zip을 쓰세요.
    - 직접 만들기: `python package_addon.py` → `Z:\App\mcp-chat-for-blender.zip` (경로는 스크립트에서 변경)
 2. Blender → **Edit › Preferences › Add-ons › Install from Disk…** → zip 선택 → 체크박스로 활성화
 3. 3D 뷰포트에서 **N 키 → `MCP Chat` 탭**
