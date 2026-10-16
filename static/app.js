@@ -20,6 +20,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const newChatBtn = document.getElementById("new-chat-btn");
   const sessionsList = document.getElementById("sessions-list");
   
+  // Session Tabs & Title
+  const sessionTabsList = document.getElementById("session-tabs-list");
+  const btnAddSessionTab = document.getElementById("btn-add-session-tab");
+  const btnRenameSession = document.getElementById("btn-rename-session");
   const currentSessionTitle = document.getElementById("current-session-title");
   const currentModelBadge = document.getElementById("current-model-badge");
   const currentReasoningBadge = document.getElementById("current-reasoning-badge");
@@ -117,14 +121,32 @@ document.addEventListener("DOMContentLoaded", () => {
       await createNewSession();
     });
 
+    // Session Tab Bar Add & Header Rename
+    if (btnAddSessionTab) {
+      btnAddSessionTab.addEventListener("click", async () => {
+        await createNewSession();
+      });
+    }
+
+    if (btnRenameSession) {
+      btnRenameSession.addEventListener("click", () => {
+        if (currentSessionId) {
+          renameSession(currentSessionId, currentSessionTitle.textContent);
+        }
+      });
+    }
+
     // Auto-resizing Textarea
     chatTextarea.addEventListener("input", () => {
       chatTextarea.style.height = "auto";
       chatTextarea.style.height = Math.min(chatTextarea.scrollHeight, 140) + "px";
     });
 
-    // Enter to send (Shift+Enter for newline)
+    // Enter to send (Shift+Enter for newline) with Korean IME safety
     chatTextarea.addEventListener("keydown", (e) => {
+      if (e.isComposing || e.keyCode === 229) {
+        return; // Do not send while composing Korean
+      }
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         sendMessage();
@@ -228,9 +250,15 @@ document.addEventListener("DOMContentLoaded", () => {
       const sessions = data.sessions || [];
 
       renderSessionsList(sessions);
+      renderSessionTabs(sessions);
 
       if (sessions.length > 0) {
-        await switchSession(sessions[0].id);
+        const found = currentSessionId && sessions.find(s => s.id === currentSessionId);
+        if (found) {
+          await switchSession(currentSessionId);
+        } else {
+          await switchSession(sessions[0].id);
+        }
       } else {
         await createNewSession();
       }
@@ -244,8 +272,10 @@ document.addEventListener("DOMContentLoaded", () => {
     sessions.forEach(s => {
       const item = document.createElement("div");
       item.className = `session-item ${s.id === currentSessionId ? "active" : ""}`;
+      item.dataset.id = s.id;
       item.innerHTML = `
         <span class="session-item-title">${escapeHtml(s.title || "새 대화")}</span>
+        <button class="session-rename-btn" title="이름 변경" style="background:none;border:none;cursor:pointer;padding:2px 4px;font-size:0.8rem;opacity:0.6;">✏️</button>
         <button class="session-delete-btn" title="삭제">✕</button>
       `;
 
@@ -253,6 +283,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (e.target.classList.contains("session-delete-btn")) {
           e.stopPropagation();
           deleteSession(s.id);
+        } else if (e.target.classList.contains("session-rename-btn")) {
+          e.stopPropagation();
+          renameSession(s.id, s.title || "새 대화");
         } else {
           switchSession(s.id);
           sidebar.classList.remove("open");
@@ -262,6 +295,67 @@ document.addEventListener("DOMContentLoaded", () => {
 
       sessionsList.appendChild(item);
     });
+  }
+
+  function renderSessionTabs(sessions) {
+    if (!sessionTabsList) return;
+    sessionTabsList.innerHTML = "";
+    sessions.forEach(s => {
+      const tab = document.createElement("div");
+      tab.className = `session-tab ${s.id === currentSessionId ? "active" : ""}`;
+      tab.dataset.id = s.id;
+      tab.innerHTML = `
+        <span class="tab-icon">💬</span>
+        <span class="tab-title" title="${escapeHtml(s.title || "새 대화")}">${escapeHtml(s.title || "새 대화")}</span>
+        <button class="tab-rename-btn" title="이름 변경">✏️</button>
+        <button class="tab-close-btn" title="삭제">✕</button>
+      `;
+
+      tab.addEventListener("click", (e) => {
+        if (e.target.classList.contains("tab-rename-btn")) {
+          e.stopPropagation();
+          renameSession(s.id, s.title || "새 대화");
+        } else if (e.target.classList.contains("tab-close-btn")) {
+          e.stopPropagation();
+          deleteSession(s.id);
+        } else {
+          switchSession(s.id);
+        }
+      });
+
+      // Double-click tab title to rename
+      const titleSpan = tab.querySelector(".tab-title");
+      if (titleSpan) {
+        titleSpan.addEventListener("dblclick", (e) => {
+          e.stopPropagation();
+          renameSession(s.id, s.title || "새 대화");
+        });
+      }
+
+      sessionTabsList.appendChild(tab);
+    });
+  }
+
+  async function renameSession(sessionId, currentTitle) {
+    const newTitle = prompt("새 세션 이름을 입력하세요:", currentTitle || "");
+    if (!newTitle || !newTitle.trim() || newTitle.trim() === currentTitle) return;
+
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: newTitle.trim() })
+      });
+      const data = await res.json();
+      if (data.session) {
+        if (sessionId === currentSessionId) {
+          currentSessionTitle.textContent = data.session.title;
+        }
+        await loadSessions();
+      }
+    } catch (err) {
+      alert("세션 이름 변경 실패: " + err.message);
+    }
   }
 
   async function createNewSession() {
@@ -309,7 +403,9 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".session-item").forEach(item => {
       item.classList.remove("active");
     });
-    // Rerender or mark active
+    document.querySelectorAll(".session-tab").forEach(tab => {
+      tab.classList.toggle("active", tab.dataset.id === currentSessionId);
+    });
     const activeEl = [...document.querySelectorAll(".session-item")].find(
       el => el.querySelector(".session-item-title")?.textContent === currentSessionTitle.textContent
     );

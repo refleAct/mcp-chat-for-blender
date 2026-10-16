@@ -62,7 +62,10 @@
             <span class="hamburger-bar"></span>
           </button>
           <div class="active-session-info">
-            <h1 class="session-title" id="current-session-title">Blender AI Assistant</h1>
+            <div class="session-title-row">
+              <h1 class="session-title" id="current-session-title">Blender AI Assistant</h1>
+              <button class="mini-rename-btn" id="btn-rename-session" title="세션 이름 변경">✏️</button>
+            </div>
             <div class="session-meta">
               <span class="model-badge" id="current-model-badge">claude-3.5-sonnet</span>
               <span class="reasoning-badge" id="current-reasoning-badge">Reasoning: Med</span>
@@ -81,6 +84,16 @@
           </button>
         </div>
       </header>
+
+      <!-- Horizontal Session Tabs Bar -->
+      <nav class="session-tabs-bar" id="session-tabs-bar">
+        <div class="tabs-scroll-container" id="session-tabs-list">
+          <!-- Dynamic session tabs rendered here -->
+        </div>
+        <button class="add-tab-btn" id="btn-add-session-tab" title="새 세션 탭 추가">
+          <span>＋ 새 탭</span>
+        </button>
+      </nav>
 
       <!-- Message History Container -->
       <section class="messages-container" id="messages-container">

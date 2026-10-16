@@ -25,12 +25,58 @@ Guidelines:
 4. If you need to verify what was created or rendered, capture the viewport image to evaluate the scene.
 """
 
+def get_safe_data_dir() -> str:
+    """
+    Finds a reliable, writable directory across Windows, Android (Termux/PRoot), and Linux.
+    Avoids Android permission errors (e.g. read-only root '/' or unpermitted ~/.config).
+    """
+    candidates = []
+
+    # 1. Standard home directory (~/.config/blender_mcp_chat)
+    try:
+        home = os.path.expanduser("~")
+        if home and home != "/" and os.path.exists(home):
+            candidates.append(os.path.join(home, ".config", "blender_mcp_chat"))
+    except Exception:
+        pass
+
+    # 2. Termux native storage
+    if os.path.exists("/data/data/com.termux/files/home"):
+        candidates.append("/data/data/com.termux/files/home/.config/blender_mcp_chat")
+
+    # 3. Blender user resources directory (if running inside Blender)
+    try:
+        import bpy
+        user_dir = bpy.utils.user_resource('DATAFILES', path='blender_mcp_chat', create=False)
+        if user_dir:
+            candidates.append(user_dir)
+    except Exception:
+        pass
+
+    # 4. Standard system temp directory (/tmp/blender_mcp_chat or %TEMP%)
+    import tempfile
+    candidates.append(os.path.join(tempfile.gettempdir(), "blender_mcp_chat"))
+
+    # Try each candidate until one can be created and written to
+    for c in candidates:
+        try:
+            os.makedirs(c, exist_ok=True)
+            test_file = os.path.join(c, ".perm_test")
+            with open(test_file, "w") as f:
+                f.write("ok")
+            os.remove(test_file)
+            return c
+        except Exception:
+            continue
+
+    # Absolute fallback to current addon directory
+    return os.path.abspath(os.path.dirname(__file__))
+
+
 class SessionManager:
     def __init__(self, db_path: Optional[str] = None):
         if not db_path:
-            home = os.path.expanduser("~")
-            data_dir = os.path.join(home, ".config", "blender_mcp_chat")
-            os.makedirs(data_dir, exist_ok=True)
+            data_dir = get_safe_data_dir()
             db_path = os.path.join(data_dir, "chat_data.db")
         
         self.db_path = db_path
@@ -262,6 +308,45 @@ class SessionManager:
             conn.cursor().execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
             conn.cursor().execute("DELETE FROM sessions WHERE id = ?", (session_id,))
             conn.commit()
+
+    # -------------------------------------------------------------
+    # Tab Sessions Management (Stable 3-Tab Mapping & Renaming)
+    # -------------------------------------------------------------
+
+    def get_tab_session_id(self, tab_index: int) -> str:
+        """Gets or creates the persistent session ID assigned to tab_index (0, 1, or 2)."""
+        key = f"tab_{tab_index}_session_id"
+        sid = self.get_setting(key)
+        if sid:
+            s = self.get_session(sid)
+            if s:
+                return sid
+        # Create a new session for this tab slot
+        new_s = self.create_session(f"세션 {tab_index + 1}")
+        self.set_setting(key, new_s["id"])
+        return new_s["id"]
+
+    def set_tab_session(self, tab_index: int, session_id: str):
+        """Assigns a session ID to a tab slot."""
+        self.set_setting(f"tab_{tab_index}_session_id", session_id)
+
+    def get_tab_sessions(self, max_tabs: int = 3) -> List[Dict[str, Any]]:
+        """Returns the list of persistent sessions for the tabs (always stable slot order)."""
+        tabs = []
+        for i in range(max_tabs):
+            sid = self.get_tab_session_id(i)
+            s = self.get_session(sid)
+            if not s:
+                s = self.create_session(f"세션 {i + 1}")
+                self.set_setting(f"tab_{i}_session_id", s["id"])
+            tabs.append(s)
+        return tabs
+
+    def rename_tab_session(self, tab_index: int, new_title: str) -> bool:
+        """Renames the session associated with the tab_index."""
+        sid = self.get_tab_session_id(tab_index)
+        self.update_session_title(sid, new_title)
+        return True
 
     # -------------------------------------------------------------
     # Messages Management

@@ -507,6 +507,21 @@ class BlenderServerManager:
             self.is_running = True
             task_queue.start() # Start task queue worker
             return True, f"Blender MCP Chat Server started on http://127.0.0.1:{self.port}"
+        except (PermissionError, OSError) as e:
+            # Fallback for Android/SELinux or restricted environments if 0.0.0.0 fails
+            if host != "127.0.0.1":
+                try:
+                    self.server = ThreadedHTTPServer(("127.0.0.1", self.port), BlenderMCPRequestHandler)
+                    self.server_thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+                    self.server_thread.start()
+                    self.is_running = True
+                    task_queue.start()
+                    return True, f"Blender MCP Chat Server started on http://127.0.0.1:{self.port} (Fallback to localhost)"
+                except Exception as inner_e:
+                    self.is_running = False
+                    return False, f"Failed to start server on port {self.port}: {str(inner_e)}"
+            self.is_running = False
+            return False, f"Failed to start server: {str(e)}"
         except Exception as e:
             self.is_running = False
             return False, f"Failed to start server: {str(e)}"

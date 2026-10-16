@@ -381,9 +381,143 @@ body {
   transition: var(--transition);
 }
 
-.ghost-btn:hover {
+.session-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mini-rename-btn {
+  background: transparent;
+  border: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+  opacity: 0.6;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: var(--transition);
+}
+
+.mini-rename-btn:hover {
+  opacity: 1;
   background: var(--bg-tertiary);
+  transform: scale(1.1);
+}
+
+/* ==========================================================================
+   Horizontal Session Tabs Bar
+   ========================================================================== */
+
+.session-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  min-height: 42px;
+}
+
+.tabs-scroll-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+}
+
+.tabs-scroll-container::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.session-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition);
+  user-select: none;
+}
+
+.session-tab:hover {
+  background: hsl(222, 22%, 22%);
+  color: var(--text-main);
   border-color: var(--border-focus);
+}
+
+.session-tab.active {
+  background: hsla(217, 91%, 60%, 0.18);
+  border-color: var(--accent-primary);
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 0 10px hsla(217, 91%, 60%, 0.25);
+}
+
+.session-tab .tab-icon {
+  font-size: 0.85rem;
+}
+
+.session-tab .tab-title {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-rename-btn, .tab-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 2px 3px;
+  border-radius: 3px;
+  opacity: 0.55;
+  transition: var(--transition);
+  color: inherit;
+}
+
+.tab-rename-btn:hover {
+  opacity: 1;
+  background: hsla(0, 0%, 100%, 0.15);
+  transform: scale(1.15);
+}
+
+.tab-close-btn:hover {
+  opacity: 1;
+  color: var(--accent-red);
+  background: hsla(0, 84%, 60%, 0.15);
+  transform: scale(1.15);
+}
+
+.add-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px dashed var(--border-color);
+  color: var(--text-sub);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition);
+}
+
+.add-tab-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-main);
+  border-color: var(--accent-primary);
 }
 
 /* ==========================================================================

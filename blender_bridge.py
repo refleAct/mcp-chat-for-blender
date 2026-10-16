@@ -14,6 +14,9 @@ import queue
 import threading
 import traceback
 
+# Import safe data dir helper to prevent Android permission errors
+from session_manager import get_safe_data_dir
+
 # bpy is only available when running inside Blender
 try:
     import bpy
@@ -251,8 +254,8 @@ class BlenderBridge:
     def save_blend_snapshot(self, custom_path=None) -> dict:
         """Saves a copy of the active .blend file to the output directory."""
         def _save():
-            home = os.path.expanduser("~")
-            output_dir = os.path.join(home, ".config", "blender_mcp_chat", "output", "blends")
+            data_dir = get_safe_data_dir()
+            output_dir = os.path.join(data_dir, "output", "blends")
             os.makedirs(output_dir, exist_ok=True)
 
             filename = f"snapshot_{int(time.time())}.blend"
@@ -273,8 +276,8 @@ class BlenderBridge:
     def capture_and_save_viewport(self, custom_path=None) -> dict:
         """Captures viewport and permanently saves to the output directory."""
         def _save_img():
-            home = os.path.expanduser("~")
-            output_dir = os.path.join(home, ".config", "blender_mcp_chat", "output", "renders")
+            data_dir = get_safe_data_dir()
+            output_dir = os.path.join(data_dir, "output", "renders")
             os.makedirs(output_dir, exist_ok=True)
 
             filename = f"render_{int(time.time())}.png"

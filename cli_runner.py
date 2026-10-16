@@ -18,11 +18,28 @@ class CLIRunner:
     def __init__(self):
         self.addon_dir = os.path.dirname(os.path.abspath(__file__))
         self.bridge_path = os.path.join(self.addon_dir, "mcp_bridge.py").replace("\\", "/")
+        if platform.system() != "Windows":
+            try:
+                os.chmod(self.bridge_path, 0o755)
+            except Exception:
+                pass
+
+    def check_android_storage_permission(self) -> Tuple[bool, str]:
+        """Checks if Android shared storage is accessible from Termux."""
+        if not (os.path.exists("/data/data/com.termux") or "TERMUX_VERSION" in os.environ):
+            return True, "Not running in Termux"
+
+        shared_paths = ["/sdcard", "/storage/emulated/0", os.path.expanduser("~/storage/shared")]
+        for p in shared_paths:
+            if os.path.exists(p) and os.access(p, os.R_OK):
+                return True, f"Storage accessible at {p}"
+
+        return False, "Termux 저장소 권한이 필요합니다. Termux 터미널에서 'termux-setup-storage'를 실행해 주세요."
 
     def detect_environment(self) -> Dict[str, Any]:
         """
         Detects current operating system, host environment (PC vs Termux),
-        and CLI binary paths.
+        CLI binary paths, and Android storage permissions.
         """
         sys_name = platform.system()
         is_windows = (sys_name == "Windows")
@@ -51,6 +68,7 @@ class CLIRunner:
 
         claude_bin = self.find_claude_cli()
         agy_bin = self.find_agy_cli()
+        storage_ok, storage_msg = self.check_android_storage_permission()
 
         return {
             "os_name": env_name,
@@ -61,7 +79,9 @@ class CLIRunner:
             "agy_bin": agy_bin,
             "claude_detected": claude_bin is not None,
             "agy_detected": agy_bin is not None,
-            "python_executable": self.get_python_executable()
+            "python_executable": self.get_python_executable(),
+            "android_storage_ok": storage_ok,
+            "android_storage_msg": storage_msg
         }
 
     def get_python_executable(self) -> str:
@@ -221,10 +241,10 @@ class CLIRunner:
         except Exception as e:
             return False, f"Failed to write agy mcp_config.json: {str(e)}"
 
-    def run_cli_command_async(self, cli_type: str, prompt: str, on_complete=None):
+    def run_cli_command_async(self, cli_type: str, prompt: str, mode: str = "CHAT", on_complete=None):
         """
         Executes claude or agy with the given prompt in a background thread,
-        handling Windows cmd extensions and shell execution properly.
+        handling Windows cmd extensions, bypass permissions, and Plan/Auto modes.
         """
         def _target():
             bin_path = self.find_claude_cli() if cli_type == "claude" else self.find_agy_cli()
@@ -239,10 +259,45 @@ class CLIRunner:
                 is_win = (platform.system() == "Windows")
                 use_shell = is_win and bin_path.lower().endswith((".cmd", ".bat"))
 
-                cmd = [bin_path, "-p", prompt]
+                if cli_type == "claude":
+                    # Place bypass permissions flags BEFORE -p prompt
+                    # --permission-mode bypassPermissions and --dangerously-skip-permissions
+                    # ensure Claude Code never blocks waiting for permissions on Termux / Android or Windows
+                    bypass_flags = [
+                        "--permission-mode", "bypassPermissions",
+                        "--dangerously-skip-permissions"
+                    ]
+
+                    if mode == "AUTO":
+                        full_prompt = (
+                            "AUTONOMOUS EXECUTION MODE: You MUST directly use the Blender MCP tools "
+                            "(execute_blender_code, get_scene_info, capture_viewport) to execute code in Blender now. "
+                            "Do NOT stop in Plan mode or ask for confirmation. Execute the Python code in Blender to complete this task.\n\nTask: "
+                            + prompt
+                        )
+                        cmd = [bin_path] + bypass_flags + ["-p", full_prompt]
+                    elif mode == "PLAN":
+                        full_prompt = (
+                            "PLAN MODE: Provide a structured step-by-step 3D modeling plan for Blender for: "
+                            + prompt
+                            + "\nDo NOT execute tools yet. Explain each step with the Python bpy code to be run."
+                        )
+                        cmd = [bin_path, "--permission-mode", "plan", "-p", full_prompt]
+                    else: # CHAT
+                        cmd = [bin_path] + bypass_flags + ["-p", prompt]
+
+                else: # agy
+                    bypass_flags = ["--dangerously-skip-permissions"]
+                    if mode == "AUTO":
+                        cmd = [bin_path] + bypass_flags + ["--mode", "auto", "-p", prompt]
+                    elif mode == "PLAN":
+                        cmd = [bin_path, "--mode", "plan", "-p", prompt]
+                    else: # CHAT
+                        cmd = [bin_path] + bypass_flags + ["-p", prompt]
 
                 proc = subprocess.Popen(
                     cmd,
+                    stdin=subprocess.DEVNULL,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,

@@ -97,6 +97,15 @@ class TaskQueueWorker:
 
                 if task_type == "code":
                     code = payload.get("code", "")
+                    
+                    # Clean markdown code blocks if AI wrapped code in ```python ... ```
+                    import re
+                    match = re.search(r"```(?:python)?\s*([\s\S]*?)```", code)
+                    if match:
+                        code = match.group(1).strip()
+                    else:
+                        code = code.strip()
+
                     res = bridge.execute_python_code(code)
                     if res.get("status") == "error":
                         success = False
