@@ -71,17 +71,17 @@ def emit(obj):
 
 def check():
     print(f"endpoint: {ENDPOINT}")
-    print(f"token   : {'설정됨' if TOKEN else '없음 (로컬 접속만 가능)'}")
+    print(f"token   : {'set' if TOKEN else 'none (local connections only)'}")
     try:
         out = post({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, timeout=10)
         tools = [t.get("name") for t in json.loads(out).get("result", {}).get("tools", [])]
-        print("OK - 도구:", ", ".join(tools) or "(없음)")
+        print("OK - tools:", ", ".join(tools) or "(none)")
         return 0
     except urllib.error.HTTPError as e:
-        hint = " (토큰이 틀렸거나 없습니다)" if e.code == 401 else ""
+        hint = " (token missing or wrong)" if e.code == 401 else ""
         print(f"FAIL - HTTP {e.code}{hint}")
     except Exception as e:
-        print(f"FAIL - {e}\n  Blender 실행/서버 시작, PC IP, 방화벽(TCP 포트), 'LAN 접속 허용'을 확인하세요.")
+        print(f"FAIL - {e}\n  Check that Blender is running with the server started, the PC IP, the firewall (TCP port) and 'Allow LAN access'.")
     return 1
 
 

@@ -1,220 +1,286 @@
-# 🧊 MCP Chat for Blender  `v0.8.2`
+# 🧊 MCP Chat for Blender  `v0.8.3`
 
-Blender 3D 뷰포트 안에서 **AI와 대화하며 3D 모델링을 시키는 애드온**입니다.
-Claude Code · Codex · agy CLI · OpenRouter 등 여러 AI 엔진을 N패널 채팅창에서 바로 쓰고, AI가 만든 파이썬(bpy) 코드를 작업 큐로 안전하게 실행·저장합니다.
+**English** | [한국어](README.ko.md) | [中文](README.zh.md) | [日本語](README.ja.md)
 
-> ## ⚠️ 알림 (미완성 부분)
-> **Blender 안드로이드(비공식 빌드)에서 Termux 연동으로 Claude를 쓰려고 했지만 미완성입니다.**
-> 안드로이드 Blender(APK)는 앱 샌드박스 때문에 Termux에 설치된 `claude`를 직접 실행할 수 없어서, Termux에 중계 서버(`termux_agent.py`)를 띄워 연결하는 방식으로 만들었습니다. 코드와 설치 스크립트는 들어 있지만 **실제 안드로이드 기기에서 끝까지 동작하는 것은 확인하지 못했습니다.**
-> 현재 정상 동작을 확인한 환경은 **Windows PC의 Blender + PC에 설치된 Claude Code**입니다. Codex CLI, agy CLI, macOS/Linux는 코드만 작성했고 검증하지 못했습니다.
+A Blender add-on that lets you **chat with AI inside the 3D Viewport and have it build 3D models for you.**
+Use Claude Code, Codex, the agy CLI, OpenRouter and more directly from the N-panel chat, and run the Python (bpy) code the AI writes safely through a task queue with automatic saving.
+
+> ## ⚠️ Notice (unfinished parts)
+> **I tried to use Claude from Termux with Blender for Android (unofficial build), but that integration is unfinished.**
+> Blender for Android (APK) cannot run the `claude` installed in Termux because of the app sandbox, so the add-on ships a relay server (`termux_agent.py`) that runs in Termux and forwards requests. The code and install script are included, but **I have not been able to confirm that it works end to end on a real Android device.**
+> The only setup verified to work is **Blender on a Windows PC + Claude Code installed on the same PC**. Codex CLI, agy CLI and macOS/Linux were written but not verified.
+
+> ## 🔑 Important: how API keys are stored
+> API keys and tokens are saved **encrypted inside the add-on folder (`.vault/`)** and are **deleted together with the add-on**. Please read [section 8](#8-api-key-storage-notes-important) before entering a key — in particular: protection strength depends on your OS, **updating by replacing the add-on folder wipes the keys**, and keys cannot be recovered if the vault is lost.
 
 ---
 
-## 1. 용도
+## 1. What it is for
 
-- Blender 안에서 "이 사진처럼 모자를 만들어 줘" 같은 문장으로 3D 모델링·재질 작업을 AI에게 시킵니다.
-- AI가 만든 코드를 바로 실행하지 않고 **작업 큐**에 쌓아 순서대로 실행하고, 성공할 때마다 `.blend` / `.glb` / 뷰포트 이미지를 자동 저장합니다.
-- 작업 전에 **계획(Plan)을 먼저 검토**하고, 마음에 들면 실행하거나 계속 수정할 수 있습니다.
+- Ask the AI in plain sentences, e.g. "make a hat like this photo", and it does the 3D modeling and materials inside Blender.
+- AI-generated code is not run blindly: it goes into a **task queue**, runs in order, and after every successful task the add-on saves a `.blend`, a `.glb` and a viewport image.
+- You can **review a plan first** and then run it or keep refining it.
 
-## 2. 주요 기능 요약
+## 2. Feature summary
 
-| 구분 | 내용 |
+| Area | What you get |
 |---|---|
-| **AI 엔진** | Claude Code(기본), Codex CLI, agy CLI, Direct API(OpenRouter · NVIDIA NIM · 로컬 Ollama · 사용자 지정) |
-| **모델/추론 설정** | N패널에서 엔진별 모델(드롭다운 + 직접 입력)과 추론 성능 선택 |
-| **모드** | Chat(대화·즉시 실행) / Plan(계획 수립 후 검토) / Auto(계획 + 자동 실행) |
-| **Plan 검토** | 계획이 나오면 **실행 · 계속 계획 · 취소** 버튼으로 선택 |
-| **작업 큐** | 등록·수정·삭제·순서 변경(▲▼)·재시도·복제, 전역 딜레이(기본 60초), 하나의 지시 = 하나의 큐 작업 |
-| **자동 저장** | 작업 성공 시 `.blend`(리소스 패킹) + `.glb` + 뷰포트 PNG, 저장 위치 지정 가능 |
-| **채팅** | 세션 탭 최대 3개, 멀티라인 히스토리(스크롤), 대화 압축·초기화, 메시지 복사 |
-| **이미지 첨부** | 로컬 이미지 / 뷰포트 스냅샷 최대 3장(작은 미리보기). AI가 참고해서 제작 |
-| **프롬프트 확인** | 전송 전 **미리보기**, 전송 후 **실제 전송된 프롬프트**(Auto는 AI 계획 포함) 보기 |
-| **AI 실행 규칙 편집** | 기본 규칙(Blender Execution Rules)을 애드온 설정에서 직접 수정·복원 |
-| **자동 업데이트** | 애드온 설정에서 GitHub Releases 최신 버전 확인 후 설치 |
-| **사용자 작업 지침** | "베벨은 2단계; 베벨 면에 검은색 버텍스 컬러 적용" 같은 지침을 모든 작업에 자동 적용 |
-| **기본 안전 규칙** | 요청하지 않은 조명·카메라 추가 금지, 기존 오브젝트 보존, 새 컬렉션에 배치, 렌더링 준비까지만 수행 |
-| **API 키 보안** | 키/토큰을 암호화해 애드온 폴더에 저장(애드온 삭제 시 함께 삭제) |
-| **MCP 서버** | Blender 안에서 MCP/웹 서버 실행. Claude Code 등이 `execute_blender_code`, `get_scene_info`, `capture_viewport` 도구로 Blender를 직접 조종 |
-| **웹 채팅 UI** | 브라우저(PC·모바일)에서도 같은 세션/큐 사용 |
-| **다국어** | 한국어 · English · 中文 · 日本語 |
-| **Blender 지원** | 3.x 이상 (MCP를 지원하는 AI 클라이언트면 버전 무관하게 연결 가능, 전 버전 검증은 미완) |
+| **AI engines** | Claude Code (default), Codex CLI, agy CLI, Direct API (OpenRouter · NVIDIA NIM · local Ollama · custom) |
+| **Model / reasoning** | Per-engine model (dropdown + custom ID) and reasoning level in the N-panel |
+| **Modes** | Chat (talk and run) / Plan (make a plan, then review) / Auto (plan + run automatically) |
+| **Plan review** | After a plan appears: **Run · Refine plan · Cancel** |
+| **Task queue** | Add, edit, delete, reorder (▲▼), retry, duplicate; global delay (default 60 s); one instruction = one queue task |
+| **Auto-save** | After each successful task: `.blend` (resources packed) + `.glb` + viewport PNG, with a configurable output folder |
+| **Chat** | Up to 3 session tabs, multi-line scrollable history, compact / clear, copy message |
+| **Image attachments** | Local images or viewport snapshots, up to 3 (small previews). The AI uses them as reference |
+| **Prompt inspection** | **Preview** the final prompt before sending, and view the **prompt that was actually sent** (for Auto, including the AI's plan) |
+| **Editable AI rules** | Edit / restore the built-in *Blender Execution Rules* in the add-on preferences |
+| **Updater** | Check and install the latest GitHub Release from the add-on preferences |
+| **User rules** | Rules such as "Bevel with 2 segments; black vertex color on bevel faces" are applied to every task |
+| **Built-in safety rules** | No unrequested lights/cameras, existing objects are preserved, new work goes into a new collection, rendering is prepared but not run |
+| **API key security** | Keys/tokens are stored encrypted inside the add-on folder (deleted together with the add-on) — see [section 8](#8-api-key-storage-notes-important) |
+| **MCP server** | Runs an MCP/web server inside Blender so Claude Code and others can drive it with `execute_blender_code`, `get_scene_info`, `capture_viewport` |
+| **Web chat UI** | Use the same sessions and queue from a browser (PC or mobile) |
+| **Languages** | 한국어 · English · 中文 · 日本語 |
+| **Blender support** | 3.x and newer (any MCP-capable AI client can connect regardless of version; not verified on every version) |
 
-## 3. 설치
+## 3. Installation
 
-1. [Releases](https://github.com/refleAct/mcp-chat-for-blender/releases)에서 **`mcp-chat-for-blender-vX.Y.Z.zip`** 을 내려받습니다.
-   - ⚠️ GitHub의 **"Source code (zip)" / "Download ZIP"은 사용하지 마세요.** 폴더 이름에 버전 점(`.`)이 들어가 Blender가 설치 후 `No module named 'mcp-chat-for-blender-0'` 오류를 냅니다. 반드시 Releases에 첨부된 zip을 쓰세요.
-   - 직접 만들기: `python package_addon.py` → `Z:\App\mcp-chat-for-blender.zip` (경로는 스크립트에서 변경)
-2. Blender → **Edit › Preferences › Add-ons › Install from Disk…** → zip 선택 → 체크박스로 활성화
-3. 3D 뷰포트에서 **N 키 → `MCP Chat` 탭**
-4. (선택) Claude Code 연동: 애드온 설정의 **Claude Code MCP 자동 등록** 클릭 후 PC에 `claude` CLI 설치
+1. Download **`mcp-chat-for-blender-vX.Y.Z.zip`** from [Releases](https://github.com/refleAct/mcp-chat-for-blender/releases).
+   - ⚠️ **Do not use GitHub's "Source code (zip)" / "Download ZIP".** Its folder name contains version dots (`.`), so Blender fails after installing with `No module named 'mcp-chat-for-blender-0'`. Always use the zip attached to the Release.
+   - Build it yourself: `python package_addon.py --ci` → `dist/mcp-chat-for-blender-vX.Y.Z.zip`
+2. In Blender: **Edit › Preferences › Add-ons › Install from Disk…** → choose the zip → enable the checkbox.
+3. In the 3D Viewport press **N → `MCP Chat` tab**.
+4. (Optional) For Claude Code: click **Auto-register Claude Code MCP** in the add-on preferences and install the `claude` CLI on your PC.
 
-### 지원 Blender 버전
+> 🔑 **To update**, use **Check for updates → Install update** in the add-on preferences. It keeps your saved keys. If you instead reinstall the zip with "overwrite", the add-on folder is replaced and **your saved API keys are deleted** (see [section 8](#8-api-key-storage-notes-important)).
 
-| 버전 | 상태 |
+### Supported Blender versions
+
+| Version | Status |
 |---|---|
-| Blender 3.x | 지원(애드온 최소 버전 3.0). 동작하는 것으로 보임 |
-| Blender 4.x 이상 | 지원 |
-| 안드로이드 Blender(비공식) | 실험적 — 위 알림 참고 |
+| Blender 3.x | Supported (add-on minimum is 3.0); appears to work |
+| Blender 4.x and newer | Supported (tested on 5.2.2: install, enable and UI drawing) |
+| Blender for Android (unofficial) | Experimental — see the notice above |
 
-- 외부 AI가 **MCP(Model Context Protocol)** 로 Blender에 접속하는 구조라서, MCP를 지원하는 AI 클라이언트라면 Blender 버전과 관계없이 연결할 수 있습니다.
-- 다만 **모든 버전에서 검증한 것은 아닙니다.** 버전에 따라 일부 UI 동작이 다를 수 있습니다. GLB 내보내기는 Blender의 glTF 애드온이 켜져 있어야 합니다.
-- 파이썬 외부 패키지는 필요 없습니다(표준 라이브러리만 사용).
+- External AI clients connect to Blender through **MCP (Model Context Protocol)**, so any MCP-capable client can connect regardless of the Blender version.
+- Not every version has been verified, and some UI behavior may differ. GLB export needs Blender's glTF add-on to be enabled.
+- No external Python packages are required (standard library only).
 
-## 4. 사용법
+## 4. How to use
 
-### 4-1. 기본 흐름
-1. N패널 **MCP Chat** 탭에서 **Engine**(기본 Claude Code)과 **모델/추론 성능**을 고릅니다.
-2. 모드를 고릅니다. **기본값은 Auto**(계획 + 자동 실행)입니다. 실행 전에 계획을 확인하고 싶으면 **Plan**을 선택하세요.
-3. 프롬프트를 입력하고 **전송**합니다. (`+` 버튼으로 이미지 첨부, 📋 버튼으로 클립보드 붙여넣기)
-4. 결과/진행 상황은 채팅 히스토리에 표시됩니다. (`⏳ 작업 중…` 줄 → 완료 시 `✅`)
+### 4-1. Basic flow
+1. In the N-panel **MCP Chat** tab choose the **Engine** (default: Claude Code) and the **model / reasoning level**.
+2. Choose a mode. **The default is Auto** (plan + run automatically). Pick **Plan** if you want to review the plan before anything runs.
+3. Type a prompt and press **Send**. (`+` attaches images, the clipboard button pastes text.)
+4. Progress and results appear in the chat history (an `⏳ …` line while working, `✅` when done).
 
-![엔진·모델·추론 성능 선택](docs/images/engine-model.png)
+![Chat panel](docs/images/chat-panel.png)
 
-### 4-2. 채팅 히스토리
-- 긴 메시지는 여러 줄로 보이고, 마우스 휠/스크롤바로 이전 대화를 볼 수 있습니다.
-- 메시지 첫 줄의 ▼ 펼치기, 📋 복사, 📝 **전송된 프롬프트 보기** 버튼.
-- 헤더의 작은 버튼: 새로고침 / 대화 **압축**(오래된 대화를 요약 1개로) / **초기화** / 세션 삭제.
+### 4-2. Chat history
+- Long messages wrap onto several lines; scroll with the mouse wheel or the scrollbar to see earlier messages.
+- Buttons on a message's first line: ▼ expand, copy, and **view the prompt that was sent**.
+- Small header buttons: reload / **compact** (turn old messages into one summary) / **clear** / delete session.
+- The **Line width** setting controls where lines wrap (Korean/CJK characters count as 2 columns). Lower it if you see `...` in the middle of a line.
 
-![채팅 히스토리](docs/images/chat-history.png)
+### 4-3. Plan → review → run
+1. Send in **Plan** mode and the AI writes a step-by-step plan.
+2. A **Review plan** box appears above the input:
+   - **Run**: queue the approved plan as one task and run it
+   - **Refine plan**: type changes or additions and the plan is rewritten
+   - **✖**: discard the plan
 
-### 4-3. Plan → 검토 → 실행
-1. **Plan** 모드로 전송하면 AI가 단계별 계획을 만듭니다.
-2. 입력창 위에 **계획 검토** 박스가 나타납니다.
-   - **실행**: 승인한 계획을 작업 큐 1건으로 등록해 실행
-   - **계속 계획**: 수정/추가 요청을 입력해 계획을 다시 작성
-   - **✖**: 계획 버리기
+### 4-4. Task queue
+- Tasks are queued by **Auto** mode or the **Queue** button.
+- Each item has a status icon (pending / running / done / failed), ▲▼ reorder, edit, retry, duplicate and delete.
+- At the bottom set the **Output folder**, **Pack resources**, **Export GLB** and the **Auto-save** toggles.
 
-### 4-4. 작업 큐
-- **Auto** 모드나 **큐 등록** 버튼으로 작업이 큐에 쌓입니다.
-- 항목마다 상태 아이콘(대기/실행중/완료/실패), ▲▼ 순서 변경, 수정, 재시도, 복제, 삭제가 있습니다.
-- 하단에서 **저장 위치**, **리소스 패킹**, **GLB 내보내기**를 설정합니다.
+![Task queue](docs/images/task-queue.png)
 
-![작업 큐](docs/images/task-queue.png)
+> Screenshots were taken from real Blender 5.2.2 with the English UI; they may differ slightly between versions.
 
-> 스크린샷은 개발 중 화면이며 버전에 따라 조금 다를 수 있습니다.
+### 4-5. User rules
+Type rules into the field below the chat; they apply to **every task**. Separate several rules with `;`.
+Example: `Bevel with 2 segments; black vertex color on bevel faces`
 
-### 4-5. 사용자 작업 지침
-입력창 아래 지침 칸에 적어 두면 **모든 작업**에 적용됩니다. 여러 개는 `;`로 구분합니다.
-예) `베벨은 2단계; 베벨 면에 검은색 버텍스 컬러 적용`
+### 4-6. Server / web UI
+- Start the server from the add-on preferences and open `http://127.0.0.1:8000` for the web chat UI.
+- External AI such as Claude Code controls Blender through `http://127.0.0.1:8000/mcp`.
 
-### 4-6. 서버 / 웹 UI
-- 애드온 설정에서 서버를 시작하면 `http://127.0.0.1:8000` 에서 웹 채팅 UI를 쓸 수 있습니다.
-- Claude Code 등 외부 AI는 `http://127.0.0.1:8000/mcp` 로 Blender를 조종합니다.
+### 4-7. Connect your own AI CLI to Blender by MCP (manual setup)
 
-## 5. 안드로이드 + Termux 연동 (실험적 · 미완성)
+The easiest way is the **Auto-register … MCP** buttons in the add-on preferences. If you prefer to do it yourself there are three ways. In every case **start the server in Blender first**, and use the add-on's bridge script `mcp_bridge.py` (inside the add-on folder) as the stdio command:
 
-> 이 기능은 **미완성**입니다. 아래는 설계된 방식이며 실기기 검증은 되지 않았습니다.
+```
+<Blender scripts>/addons/mcp-chat-for-blender/mcp_bridge.py
+Windows example: C:/Users/<you>/AppData/Roaming/Blender Foundation/Blender/<version>/scripts/addons/mcp-chat-for-blender/mcp_bridge.py
+```
 
-1. Blender(안드로이드)에서 서버 시작
-2. Termux에서: `curl -fsS http://127.0.0.1:8000/termux/setup.sh | bash`
-   - MCP 브릿지 다운로드, `claude`/`agy`/`codex` MCP 등록, **Termux Agent**(`127.0.0.1:8787`) 실행
-3. Blender 설정 › **Termux Agent**에 출력된 URL/토큰 입력 → **Agent 연결 테스트**
-4. Agent가 꺼졌다면 Termux에서 `bash ~/.config/blender_mcp_chat/start_agent.sh`
+**A. Run the CLI's own command**
 
-PC의 Blender를 폰의 Termux에서 조종하려면 **LAN 접속 허용**을 켜고(토큰 인증), PC 방화벽에서 TCP 8000을 허용한 뒤 설정 화면의 **Termux 설치 명령 복사**를 사용합니다.
+| CLI | Command | Check |
+|---|---|---|
+| Claude Code | `claude mcp add -s user blender -- python "<path>/mcp_bridge.py"` | `claude mcp list` |
+| Codex CLI | `codex mcp add blender -- python "<path>/mcp_bridge.py"` (recent versions) | `codex mcp list` |
+| agy | (command unknown — use B) | — |
 
-## 6. 언어 지원
+**B. Edit the config file yourself**
 
-| 언어 | 애드온(Blender) UI | 웹 UI |
+- Claude Code — `~/.claude.json`:
+  ```json
+  { "mcpServers": { "blender": { "command": "python", "args": ["<path>/mcp_bridge.py"] } } }
+  ```
+- Codex CLI — `~/.codex/config.toml`:
+  ```toml
+  [mcp_servers.blender]
+  command = "python"
+  args = ["<path>/mcp_bridge.py"]
+  ```
+- agy — `~/.gemini/config/mcp_config.json` (the file the add-on writes): the same `mcpServers` JSON shape as Claude Code.
+
+**C. Ask the CLI with a prompt**
+
+> Register an MCP server named `blender` that runs `python <path>/mcp_bridge.py` over stdio.
+
+The CLI picks the right command for its own version. Ask it to show the command before running it, then verify with the list command from A.
+
+**Test the connection**
+- `python <path>/mcp_bridge.py --check` should print `OK - tools: execute_blender_code, get_scene_info, capture_viewport, …`.
+- For a Blender on another machine (e.g. a PC reached from Termux) set `BLENDER_MCP_URL=http://<PC-IP>:8000/mcp` and `BLENDER_MCP_TOKEN=<token>` (or write them to `~/.config/blender_mcp_chat/bridge.json`).
+
+> ⚠️ In this project's own testing only the Claude Code route on Windows has been used. The Codex and agy steps follow each CLI's usual pattern, but command names and file locations can differ between versions — check `--help` or the CLI's documentation.
+
+## 5. Android + Termux (experimental · unfinished)
+
+> This feature is **unfinished**. What follows is the intended design and it has not been verified on a real device.
+
+1. Start the server in Blender (Android).
+2. In Termux run: `curl -fsS http://127.0.0.1:8000/termux/setup.sh | bash`
+   - Downloads the MCP bridge, registers MCP for `claude`/`agy`/`codex`, and starts the **Termux Agent** (`127.0.0.1:8787`).
+3. In the Blender preferences enter the printed URL/token under **Termux Agent** → **Test Agent connection**.
+4. If the Agent stopped, run `bash ~/.config/blender_mcp_chat/start_agent.sh` in Termux.
+
+To control a PC's Blender from Termux on a phone, turn on **LAN access** (token-protected), allow TCP 8000 in the PC firewall, and use **Copy Termux install command** in the preferences.
+
+## 6. Language support
+
+| Language | Add-on (Blender) UI | Web UI |
 |---|---|---|
 | 한국어 | ✅ | ✅ |
 | English | ✅ | ❌ |
 | 中文 (简体) | ✅ | ❌ |
 | 日本語 | ✅ | ❌ |
 
-- 애드온 설정 맨 위 **Language** 에서 자동(Blender 언어) / 한 / 영 / 중 / 일을 선택합니다.
-- 번역은 `i18n.py`의 표 한 곳에서 수정·추가할 수 있습니다. 표에 없는 문구는 원문 그대로 표시됩니다.
-- 툴팁, 이전에 저장된 채팅 내용, AI 응답 언어, 웹 UI는 번역되지 않습니다.
+- Choose Auto (follow Blender) / Korean / English / Chinese / Japanese in **Language** at the top of the add-on preferences.
+- All translations live in one table in `i18n.py`; add or fix entries there. Text that is not in the table is shown as written.
+- Tooltips, previously saved chat content, the AI's reply language and the web UI are not translated.
+- This README is available in four languages: [English](README.md) · [한국어](README.ko.md) · [中文](README.zh.md) · [日本語](README.ja.md).
 
-## 7. 구조
+## 7. Structure
 
 ```
 mcp-chat-for-blender/
-├─ __init__.py          Blender 애드온 본체: 패널·연산자·설정, 채팅/큐 UI
-├─ blender_bridge.py    Blender 메인 스레드 안전 실행, 씬 정보, 뷰포트 캡처, .blend/.glb 저장
-├─ task_queue.py        작업 큐 워커(순차 실행·진행 표시·자동 저장·들여쓰기 복구)
-├─ session_manager.py   SQLite 저장소(세션·메시지·큐·설정), 암호화 키 연동
-├─ llm_client.py        Direct API 클라이언트, Plan 프롬프트 생성
-├─ cli_runner.py        claude / codex / agy CLI 실행, 프롬프트 조립, Termux Agent 호출
-├─ guidelines.py        AI 기본 규칙 + 사용자 작업 지침(모든 엔진 공통)
-├─ secrets_store.py     API 키/토큰 암호화 금고 (DPAPI · openssl · 난독화 폴백)
-├─ i18n.py              UI 번역 표 (ko/en/zh/ja)
-├─ server.py            HTTP/MCP 서버, 웹 UI·REST API, 토큰 인증
-├─ mcp_handler.py       MCP JSON-RPC 도구 처리
-├─ mcp_bridge.py        stdio ↔ HTTP MCP 브릿지 (Claude Code 등에서 사용)
-├─ termux_agent.py      Termux에서 실행하는 CLI 중계 서버
-├─ install_termux.sh    PRoot 환경 설치 스크립트
-├─ package_addon.py     배포용 zip 패키징
-├─ static/              웹 채팅 UI (index.html · app.js · style.css)
-└─ docs/images/         README 스크린샷
+├─ __init__.py          Add-on entry: panels, operators, preferences, chat/queue UI
+├─ blender_bridge.py    Main-thread-safe execution, scene info, viewport capture, .blend/.glb saving
+├─ task_queue.py        Queue worker (sequential run, progress, auto-save, indentation repair)
+├─ session_manager.py   SQLite store (sessions, messages, queue, settings) + encrypted key access
+├─ llm_client.py        Direct API client and plan-prompt builder
+├─ cli_runner.py        Runs claude / codex / agy, builds prompts, calls the Termux Agent
+├─ guidelines.py        Built-in AI rules + user rules (shared by every engine)
+├─ secrets_store.py     Encrypted vault for API keys/tokens (DPAPI · openssl · obfuscation fallback)
+├─ i18n.py              UI translation table (ko/en/zh/ja)
+├─ updater.py           GitHub Releases update check/installer
+├─ server.py            HTTP/MCP server, web UI and REST API, token auth
+├─ mcp_handler.py       MCP JSON-RPC tool handling
+├─ mcp_bridge.py        stdio ↔ HTTP MCP bridge (used by Claude Code etc.)
+├─ termux_agent.py      CLI relay server that runs in Termux
+├─ install_termux.sh    PRoot install script
+├─ package_addon.py     Release zip packaging (--ci for GitHub Actions)
+├─ static/              Web chat UI (index.html · app.js · style.css)
+├─ docs/images/         README screenshots
+└─ .github/workflows/   Release automation (a v* tag builds and publishes the zip)
 ```
 
-데이터 위치: `~/.config/blender_mcp_chat/` (대화 DB, 저장된 .blend/.glb/이미지). 암호화된 키는 애드온 폴더 안 `.vault/`에 있습니다.
+Data location: `~/.config/blender_mcp_chat/` (chat DB, saved .blend/.glb/images). Encrypted keys live in `.vault/` inside the add-on folder.
 
-## 8. 보안 메모
-- API 키·토큰은 암호화 저장되며 웹 API는 키를 돌려주지 않습니다.
-- LAN 접속은 기본 꺼짐이며, 켜면 Bearer 토큰이 필요합니다. 로컬 접속도 Origin/Host를 검사합니다.
-- 이 애드온은 AI가 만든 **파이썬 코드를 Blender에서 실행**합니다. 중요한 작업 파일은 백업하고 신뢰하는 AI/네트워크에서만 사용하세요.
+## 8. API key storage notes (important)
 
-## 9. 알려진 한계
-- 안드로이드 Termux 연동 미완성(위 알림 참고)
-- Blender 입력창에서 **한글 입력 중 띄어쓰기**가 안 되는 문제가 보고됨 (Blender/IME 쪽 문제로 추정). 웹 채팅 UI 입력이나 붙여넣기 버튼으로 우회 가능
-- CLI 엔진(Claude/Codex/agy)은 매 요청이 새 대화로 실행됨(이전 대화 이어쓰기 없음)
-- 진행 표시는 글자 기반이며 회전 애니메이션은 없음
+**Where keys are kept**
+- API keys (OpenRouter / NVIDIA NIM / custom) and the LAN / Agent tokens are saved **encrypted in `.vault/` inside the add-on folder**.
+- They are **never written** to Blender's user preferences, to `.blend` files, or to the chat database. The settings fields are write-only (they show "saved (encrypted)" plus a delete button), and the web API only returns `********`.
+- Removing the add-on folder removes the keys too. The **Delete all data** button in the preferences wipes the vault, the chat database and the saved outputs (the chat database and outputs live outside the add-on folder, in `~/.config/blender_mcp_chat/`, so they stay after uninstalling unless you use this button).
 
-## 10. 버전 규칙
+**Protection strength depends on the OS**
 
-- 현재 버전: **0.8.2**
-- **기능 추가**: 0.1 단위로 올림 (0.8 → 0.9 → 1.0 …)
-- **버그 수정**: 0.0.1 단위로 올림 (0.8.1 → 0.8.2 … 최대 0.8.999)
-- Blender `bl_info`에는 `(0, 8, 2)` 형태의 튜플로 기록됩니다. 변경 내역은 [CHANGELOG.md](CHANGELOG.md) 참고.
-
-## 11. 출처 및 참조 (Credits)
-
-이 프로젝트는 아래 사양·도구·서비스를 **참조하거나 외부 프로그램으로 호출**합니다. 이름과 상표는 각 소유자에게 있으며, 이 프로젝트는 이들과 제휴 관계가 아닙니다.
-
-| 항목 | 이 프로젝트에서의 사용 | 출처 |
+| Environment | Method | What it protects against |
 |---|---|---|
-| **MCP (Model Context Protocol)** | Blender 제어용 서버(`mcp_handler.py`)·stdio 브릿지(`mcp_bridge.py`)를 **공개 사양(프로토콜 버전 2024-11-05)을 보고 직접 구현**. 외부 MCP SDK 코드는 포함하지 않음 | Anthropic · <https://modelcontextprotocol.io> |
-| **Claude Code** | 외부 CLI로 실행 (`claude -p`, `--model`, `--effort`, `--permission-mode`) | Anthropic · <https://docs.claude.com/en/docs/claude-code> |
-| **Codex CLI** | 외부 CLI로 실행 (`codex exec`, `-m`, `-i`, `-c model_reasoning_effort`), `~/.codex/config.toml` MCP 등록 | OpenAI · <https://github.com/openai/codex> |
-| **agy CLI** | 외부 CLI로 실행 (Antigravity) | Google Antigravity |
-| **OpenRouter / NVIDIA NIM / Ollama · LM Studio** | Direct API 모드 (OpenAI 호환 Chat Completions 형식) | <https://openrouter.ai> · <https://build.nvidia.com> · <https://ollama.com> |
-| **Blender Python API (`bpy`)** | 애드온 UI, 씬 제어, 저장 | Blender Foundation · <https://docs.blender.org/api/current/> (GPL) |
-| **glTF 2.0 / glTF-Blender-IO** | `.glb` 내보내기에 Blender 내장 glTF 애드온 호출 | Khronos Group · <https://github.com/KhronosGroup/glTF-Blender-IO> (Apache-2.0) |
-| **ambientCG** | AI 지침의 "AmbientCG 스타일 PBR 재질" 참조 (텍스처 파일은 포함하지 않음) | <https://ambientcg.com> (CC0) |
-| **Termux** | 안드로이드 연동 대상 환경 (실험적) | <https://termux.dev> |
-| **Windows DPAPI / OpenSSL** | API 키 암호화 저장 (Windows는 DPAPI, 그 외 `openssl enc -aes-256-cbc`) | Microsoft · <https://www.openssl.org> (Apache-2.0) |
-| **GitHub Releases API** | 애드온 업데이트 확인 | <https://docs.github.com/rest/releases> |
-| **Python 표준 라이브러리** | `http.server`, `sqlite3`, `urllib`, `zipfile` 등 (외부 패키지 번들 없음) | Python Software Foundation |
+| Windows | DPAPI, bound to your Windows account | A copied vault file cannot be decrypted on another PC or by another Windows user |
+| macOS / Linux / Termux | `openssl enc -aes-256-cbc` with a random key file stored next to the vault (permissions 600) | Casual leaks (screenshots, copied files). **Not** malware running as the same user |
+| Android APK without `openssl` | Weak obfuscation (the preferences show a warning) | Only hides keys from casual viewing — **do not rely on it** |
 
-- 외부 라이브러리/SDK 소스코드는 이 저장소에 **포함하지 않았습니다**(표준 라이브러리만 사용). 외부 서비스·CLI는 사용자가 직접 설치/가입해야 합니다.
-- 설계와 구현은 **Anthropic Claude Code** 와의 협업으로 작성되었습니다.
-- 이 애드온은 `bpy`를 사용하므로 Blender의 GPL과 **호환되는 라이선스(MIT 기반)** 로 배포합니다.
-- 출처에 빠졌거나 잘못된 항목은 이슈로 알려 주세요.
+**Please be careful with**
+1. **Updating by replacing the folder deletes your keys.** Use the built-in updater (Check for updates → Install update), which preserves `.vault/`. A manual reinstall with "overwrite" replaces the folder and you must enter the keys again.
+2. **Keys cannot be recovered** if the vault is lost or becomes undecryptable (different Windows account, reinstalled OS). Keep the original key at the provider, and revoke / regenerate a key if you suspect a leak.
+3. **Never commit or share `.vault/`** (it is in `.gitignore`), and avoid sharing screenshots of the preferences screen.
+4. **Older versions stored keys in plain text** (the chat database and Blender preferences). The first launch of the new version moves them into the vault and removes them, but **old copies may remain** in backups (for example `userpref.blend@` files or copied databases). If you ever shared those, revoke the old keys.
+5. **Do not paste keys into prompts.** Prompts, AI replies and attached images are stored locally **in plain text** in the chat database, and they are sent to the AI service you chose. Claude Code / Codex / agy use their own login; this add-on does not store those credentials.
+6. Keys are sent to the provider over HTTPS (local Ollama/LM Studio uses plain `http://localhost`). The code the AI writes **runs inside Blender with your user permissions** and could read files — use only AI services you trust.
 
-## 12. 작성
-- 작성: **refleAct**
-- AI 협업: Anthropic **Claude Code**와 함께 설계·구현
-- 비공식 프로젝트이며 Blender Foundation, Anthropic, OpenAI, Google과 무관합니다.
+**Other security notes**
+- LAN access is off by default; when on, a Bearer token is required. Even local requests have their Origin/Host checked.
+- This add-on **executes Python code written by an AI inside Blender.** Back up important files and use it only on networks you trust.
 
-## 13. 라이선스
+## 9. Known limitations
+- Android Termux integration is unfinished (see the notice above).
+- Typing a **space while entering Korean** in Blender's text field has been reported not to work (likely a Blender/IME issue). Work around it with the web chat UI or the clipboard paste button.
+- CLI engines (Claude/Codex/agy) start a fresh conversation for every request (no continuation of earlier turns).
+- Progress is shown as text; there is no spinning animation.
 
-**MIT 기반 + 출처 표기 유지 조건**
+## 10. Versioning
 
-- ✅ **소스 수정** 가능
-- ✅ **재배포** 가능 (수정본 포함, 상업적 이용 포함)
-- ⚠️ **저작권 표기와 출처는 변경·삭제하지 마세요.** 수정·배포할 때 원 저작자(작성: refleAct)와 이 라이선스 문구를 그대로 유지해야 합니다.
-- 소프트웨어는 **있는 그대로** 제공되며, 사용으로 인한 문제(작업 파일 손상 등)에 책임지지 않습니다.
+- Current version: **0.8.3**
+- **New features**: bump by 0.1 (0.8 → 0.9 → 1.0 …)
+- **Bug fixes**: bump by 0.0.1 (0.8.1 → 0.8.2 … up to 0.8.999)
+- Blender's `bl_info` stores it as a tuple such as `(0, 8, 3)`. See [CHANGELOG.md](CHANGELOG.md).
+- Pushing a `v*` tag builds the zip with GitHub Actions and publishes it as a Release automatically.
+- **Releases accumulate, one per version** (older ones are kept). The add-on's **Check for updates** button looks up the *latest* Release and installs it when it is newer than the installed version.
 
-전문은 [LICENSE](LICENSE) 파일을 참고하세요.
+## 11. Credits and references
 
----
+This project **references, or calls as external programs,** the specifications, tools and services below. Names and trademarks belong to their owners; this project is not affiliated with them.
 
-## English summary
+| Item | Use in this project | Source |
+|---|---|---|
+| **MCP (Model Context Protocol)** | The Blender control server (`mcp_handler.py`) and stdio bridge (`mcp_bridge.py`) were **implemented directly from the public specification (protocol version 2024-11-05)**. No external MCP SDK code is included | Anthropic · <https://modelcontextprotocol.io> |
+| **Claude Code** | Run as an external CLI (`claude -p`, `--model`, `--effort`, `--permission-mode`) | Anthropic · <https://docs.claude.com/en/docs/claude-code> |
+| **Codex CLI** | Run as an external CLI (`codex exec`, `-m`, `-i`, `-c model_reasoning_effort`); MCP registration in `~/.codex/config.toml` | OpenAI · <https://github.com/openai/codex> |
+| **agy CLI** | Run as an external CLI (Antigravity) | Google Antigravity |
+| **OpenRouter / NVIDIA NIM / Ollama · LM Studio** | Direct API mode (OpenAI-compatible Chat Completions format) | <https://openrouter.ai> · <https://build.nvidia.com> · <https://ollama.com> |
+| **Blender Python API (`bpy`)** | Add-on UI, scene control, saving | Blender Foundation · <https://docs.blender.org/api/current/> (GPL) |
+| **glTF 2.0 / glTF-Blender-IO** | Calls Blender's built-in glTF add-on for `.glb` export | Khronos Group · <https://github.com/KhronosGroup/glTF-Blender-IO> (Apache-2.0) |
+| **ambientCG** | Referenced by the AI rules ("AmbientCG-style PBR material"); no texture files are bundled | <https://ambientcg.com> (CC0) |
+| **Termux** | Target environment for the Android integration (experimental) | <https://termux.dev> |
+| **Windows DPAPI / OpenSSL** | Encrypted API-key storage (DPAPI on Windows, otherwise `openssl enc -aes-256-cbc`) | Microsoft · <https://www.openssl.org> (Apache-2.0) |
+| **GitHub Releases API** | Add-on update check | <https://docs.github.com/rest/releases> |
+| **Python standard library** | `http.server`, `sqlite3`, `urllib`, `zipfile`, etc. (no external packages bundled) | Python Software Foundation |
 
-**MCP Chat for Blender** lets you chat with AI (Claude Code, Codex CLI, agy CLI, OpenRouter/NVIDIA NIM/Ollama) in Blender's N-panel to build 3D models. AI-generated bpy code runs through a safe task queue with auto-save (`.blend` with packed resources, `.glb`, viewport PNG). Includes plan review (run / refine), prompt preview, user rules, encrypted API-key storage, and UI languages ko/en/zh/ja.
+- No external library/SDK source code is **included** in this repository (standard library only). External services and CLIs must be installed or signed up for by the user.
+- Designed and implemented in collaboration with **Anthropic Claude Code**.
+- Because the add-on uses `bpy`, it is distributed under a license **compatible with Blender's GPL** (MIT-based).
+- If a source is missing or wrong, please open an issue.
 
-> **Notice:** Using Claude through Termux from the unofficial Blender for Android is **incomplete and unverified**. Verified setup: Blender on Windows PC with Claude Code on the same PC.
+## 12. Author
+- Author: **refleaction**
+- AI collaboration: designed and implemented together with Anthropic **Claude Code**
+- Unofficial project, not affiliated with the Blender Foundation, Anthropic, OpenAI or Google.
 
-License: MIT-based — modify and redistribute freely, but **do not remove or alter the copyright/attribution notice**. See [LICENSE](LICENSE).
+## 13. License
+
+**MIT-based + attribution must be preserved**
+
+- ✅ You may **modify the source**
+- ✅ You may **redistribute** it (including modified versions and commercial use)
+- ⚠️ **Do not change or remove the copyright notice and attribution.** When you modify and redistribute, keep the original author (refleaction) and this license text intact.
+- The software is provided **as is**; the author is not liable for any problems caused by its use (such as damaged project files, leaked keys or API charges).
+
+See the [LICENSE](LICENSE) file for the full text.

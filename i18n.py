@@ -66,8 +66,8 @@ _T = {
     "대기: {}": (None, "Pending: {}", "等待: {}", "待機: {}"),
     "실행중: {}": (None, "Running: {}", "执行中: {}", "実行中: {}"),
     "완료: {}": (None, "Done: {}", "完成: {}", "完了: {}"),
-    "PAUSED (일시정지)": (None, "PAUSED", "已暂停", "一時停止中"),
-    "RUNNING (동작중)": (None, "RUNNING", "运行中", "実行中"),
+    "PAUSED (일시정지)": ("일시정지", "PAUSED", "已暂停", "一時停止中"),
+    "RUNNING (동작중)": ("동작중", "RUNNING", "运行中", "実行中"),
     "작업큐 로딩 오류: {}": (None, "Queue panel error: {}", "队列面板加载错误: {}", "キューパネルのエラー: {}"),
     # ---- preferences ----
     "사용자 작업 지침 (모든 AI 작업에 적용)": (None, "User rules (applied to every AI task)", "用户工作准则 (适用于所有 AI 任务)", "ユーザー作業指針 (すべてのAI作業に適用)"),

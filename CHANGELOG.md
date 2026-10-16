@@ -2,6 +2,12 @@
 
 버전 규칙: 기능 추가 = 0.1 단위, 버그 수정 = 0.0.1 단위 (최대 .999)
 
+## 0.8.3
+- Author/maintainer shown as **refleaction** (add-on info, LICENSE, README)
+- README in English / 한국어 / 中文 / 日本語 with real English UI screenshots; API-key storage notes; manual MCP setup for each CLI
+- Default chat wrap width 26 cells (no mid-line `...`), shorter model labels, queue state label fully translated
+- `mcp_bridge.py --check` output is now English
+
 ## 0.8.2
 - GitHub Actions: pushing a `v*` tag builds the add-on zip and publishes it to Releases automatically
 - Install guide: use the Releases zip, not GitHub's "Source code (zip)" (that one fails with `No module named 'mcp-chat-for-blender-0'`)

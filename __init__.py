@@ -1,7 +1,7 @@
 bl_info = {
     "name": "MCP Chat for Blender (Android & Termux & PC)",
-    "author": "Antigravity & Blender Community",
-    "version": (0, 8, 2),
+    "author": "refleaction",
+    "version": (0, 8, 3),
     "blender": (3, 0, 0),
     "location": "3D Viewport > Sidebar > MCP Chat",
     "description": "Embedded In-Blender Chat with 3 Session Tabs, Up to 3 Images, 8-row Scroll, Plan/Auto Mode, Claude Code & agy CLI Integration",
@@ -210,9 +210,9 @@ def _secret_row(layout, prefs, prop):
 # 엔진별 지원 모델 (드롭다운). 목록에 없는 모델은 '직접 입력'으로 지정.
 CLI_MODEL_ITEMS = {
     "claude": [
-        ("opus", "Opus (latest alias)", "claude --model opus"),
-        ("sonnet", "Sonnet (latest alias)", "claude --model sonnet"),
-        ("haiku", "Haiku (latest alias)", "claude --model haiku"),
+        ("opus", "Opus", "claude --model opus (latest alias)"),
+        ("sonnet", "Sonnet", "claude --model sonnet (latest alias)"),
+        ("haiku", "Haiku", "claude --model haiku (latest alias)"),
         ("claude-opus-5-5", "Opus 5.5", "claude-opus-5-5"),
         ("claude-sonnet-5-5", "Sonnet 5.5", "claude-sonnet-5-5"),
         ("claude-haiku-5-5", "Haiku 5.5", "claude-haiku-5-5"),
@@ -767,7 +767,7 @@ def rebuild_lines(scene, scroll_to_end=False, sid=None):
     """메시지 -> 줄 단위 행으로 변환. UIList 네이티브 스크롤바/휠 스크롤을 사용하기 위함."""
     lines = scene.mcpchat_lines
     lines.clear()
-    cells = max(16, getattr(scene, "mcpchat_wrap_cells", 34))
+    cells = max(12, getattr(scene, "mcpchat_wrap_cells", 26))
     for idx, m in enumerate(scene.mcpchat_messages):
         suffix = f" [img {m.img_count}]" if m.img_count else ""
         expandable = len(m.full_text) > len(m.content) + 3
@@ -2340,7 +2340,7 @@ class MCPCHAT_PT_queue_panel(Panel):
             box_status = layout.box()
             state_icon = 'PAUSE' if is_paused else 'PLAY'
             state_str = "PAUSED (일시정지)" if is_paused else "RUNNING (동작중)"
-            box_status.label(text=f"Queue Worker: {state_str}", icon=state_icon)
+            box_status.label(text=f"Queue Worker: {tr(state_str)}", icon=state_icon)
             
             row_counts = box_status.row(align=True)
             row_counts.label(text=f"대기: {counts.get('pending', 0)}")
@@ -2431,8 +2431,8 @@ class MCPCHAT_PT_queue_panel(Panel):
             row_pk = box_out.row(align=True)
             row_pk.prop(scene, "mcpchat_auto_save_pack", toggle=True)
             row_pk.prop(scene, "mcpchat_auto_save_glb", toggle=True)
+            box_out.label(text="자동 저장:", icon='FILE_TICK')
             row_save = box_out.row(align=True)
-            row_save.label(text="자동 저장:", icon='FILE_TICK')
             row_save.prop(scene, "mcpchat_auto_save_blend", toggle=True)
             row_save.prop(scene, "mcpchat_auto_save_image", toggle=True)
 
@@ -2706,7 +2706,7 @@ def register():
         update=_sync_scene_setting("output_dir"))
     bpy.types.Scene.mcpchat_wrap_cells = IntProperty(
         name="줄 너비", description="한 줄에 들어가는 글자 폭 (한글 2칸·영문 1칸). 말줄임(...)이 보이면 줄이세요",
-        default=34, min=16, max=100,
+        default=26, min=12, max=100,
         update=lambda self, ctx: rebuild_lines(self))
     bpy.types.Scene.mcpchat_queue_delay = IntProperty(
         name="Queue Delay (s)",
