@@ -9,7 +9,7 @@ import time
 import threading
 from typing import Dict, Any, Optional
 
-from session_manager import session_mgr
+import session_manager
 from blender_bridge import bridge
 
 
@@ -20,6 +20,17 @@ class TaskQueueWorker:
         self.is_paused = False
         self.active_task: Optional[Dict[str, Any]] = None
         self._lock = threading.Lock()
+
+    def _get_mgr(self):
+        mgr = session_manager.session_mgr
+        if not hasattr(mgr, "list_queue_tasks"):
+            try:
+                import importlib
+                importlib.reload(session_manager)
+                mgr = session_manager.session_mgr
+            except Exception:
+                pass
+        return mgr
 
     def start(self):
         """Starts the background queue processor."""
@@ -44,9 +55,10 @@ class TaskQueueWorker:
 
     def get_status(self) -> Dict[str, Any]:
         with self._lock:
-            settings = session_mgr.get_all_settings()
+            mgr = self._get_mgr()
+            settings = mgr.get_all_settings()
             delay = float(settings.get("queue_delay_seconds", 2.0))
-            tasks = session_mgr.list_queue_tasks(limit=100)
+            tasks = mgr.list_queue_tasks(limit=100) if hasattr(mgr, "list_queue_tasks") else []
             
             pending = sum(1 for t in tasks if t["status"] == "pending")
             running = sum(1 for t in tasks if t["status"] == "running")
@@ -73,8 +85,10 @@ class TaskQueueWorker:
                 time.sleep(0.5)
                 continue
 
+            mgr = self._get_mgr()
+
             # Fetch next pending task
-            task = session_mgr.get_next_pending_task()
+            task = mgr.get_next_pending_task()
             if not task:
                 self.active_task = None
                 time.sleep(0.5)
@@ -82,7 +96,7 @@ class TaskQueueWorker:
 
             task_id = task["id"]
             self.active_task = task
-            session_mgr.update_task_status(task_id, "running")
+            mgr.update_task_status(task_id, "running")
 
             # Execute task
             result_text = ""
@@ -124,13 +138,13 @@ class TaskQueueWorker:
                 # Auto-save after execution
                 if success:
                     # 1. Auto-save .blend snapshot
-                    if session_mgr.get_setting("auto_save_blend", "true") == "true":
+                    if mgr.get_setting("auto_save_blend", "true") == "true":
                         snap_res = bridge.save_blend_snapshot()
                         if snap_res.get("status") == "success":
                             output_blend_path = snap_res.get("filepath")
 
                     # 2. Auto-save viewport image
-                    if session_mgr.get_setting("auto_save_image", "true") == "true":
+                    if mgr.get_setting("auto_save_image", "true") == "true":
                         img_res = bridge.capture_and_save_viewport()
                         if img_res.get("status") == "success":
                             output_image_path = img_res.get("filepath")
@@ -141,7 +155,7 @@ class TaskQueueWorker:
 
             # Update final status
             final_status = "completed" if success else "failed"
-            session_mgr.update_task_status(
+            mgr.update_task_status(
                 task_id=task_id,
                 status=final_status,
                 output_blend=output_blend_path,
@@ -153,7 +167,7 @@ class TaskQueueWorker:
 
             # Apply Global Delay between tasks
             try:
-                delay = float(session_mgr.get_setting("queue_delay_seconds", 2.0))
+                delay = float(mgr.get_setting("queue_delay_seconds", 2.0))
             except Exception:
                 delay = 2.0
 

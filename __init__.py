@@ -23,17 +23,43 @@ from bpy.props import (
 from bpy.types import Panel, Operator, AddonPreferences, UIList, PropertyGroup, Menu
 from bpy_extras.io_utils import ImportHelper
 
+import importlib
+
 # Ensure current addon directory is in sys.path
 addon_dir = os.path.dirname(os.path.abspath(__file__))
 if addon_dir not in sys.path:
     sys.path.append(addon_dir)
 
-from server import server_mgr
-from session_manager import session_mgr
-from blender_bridge import bridge
-from task_queue import task_queue
-from cli_runner import cli_runner
-from llm_client import LLMClient
+# Forcibly reload submodules on Blender 'Reload Scripts' (bpy.ops.script.reload)
+_submodules = [
+    "session_manager",
+    "blender_bridge",
+    "task_queue",
+    "cli_runner",
+    "llm_client",
+    "server",
+    "mcp_handler",
+]
+for _mod in _submodules:
+    if _mod in sys.modules:
+        try:
+            importlib.reload(sys.modules[_mod])
+        except Exception:
+            pass
+
+import server
+import session_manager
+import blender_bridge
+import task_queue as tq_mod
+import cli_runner
+import llm_client
+
+server_mgr = server.server_mgr
+session_mgr = session_manager.session_mgr
+bridge = blender_bridge.bridge
+task_queue = tq_mod.task_queue
+cli_runner = cli_runner.cli_runner
+LLMClient = llm_client.LLMClient
 
 
 # ==============================================================================
@@ -204,10 +230,17 @@ class MCPCHAT_OT_reload_addon(Operator):
 
     def execute(self, context):
         try:
+            import importlib
+            for _mod in ["session_manager", "blender_bridge", "task_queue", "cli_runner", "llm_client", "server", "mcp_handler"]:
+                if _mod in sys.modules:
+                    try:
+                        importlib.reload(sys.modules[_mod])
+                    except Exception:
+                        pass
             tab_idx = getattr(context.scene, "mcpchat_active_tab", 0)
-            sid = session_mgr.get_tab_session_id(tab_idx)
+            sid = session_manager.session_mgr.get_tab_session_id(tab_idx)
             sync_messages_to_ui(context.scene, sid)
-            self.report({'INFO'}, "MCP Chat 세션이 새로고침되었습니다.")
+            self.report({'INFO'}, "MCP Chat 세션 및 모듈이 새로고침되었습니다.")
         except Exception as e:
             self.report({'ERROR'}, f"새로고침 실패: {e}")
         return {'FINISHED'}
@@ -646,7 +679,16 @@ class MCPCHAT_PT_chat_panel(Panel):
             # -------------------------------------------------------------
             # 1. 3 Session Tabs Bar: [ 세션 1: 이름 ] [ 세션 2: 이름 ] [ 세션 3: 이름 ]
             # -------------------------------------------------------------
-            tab_sessions = session_mgr.get_tab_sessions(3)
+            mgr = session_manager.session_mgr
+            if not hasattr(mgr, "get_tab_sessions"):
+                try:
+                    import importlib
+                    importlib.reload(session_manager)
+                    mgr = session_manager.session_mgr
+                except Exception:
+                    pass
+
+            tab_sessions = mgr.get_tab_sessions(3) if hasattr(mgr, "get_tab_sessions") else [{"title": f"세션 {i+1}"} for i in range(3)]
             raw_idx = getattr(scene, "mcpchat_active_tab", 0)
             active_idx = max(0, min(2, raw_idx))
 
