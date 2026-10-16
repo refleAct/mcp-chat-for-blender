@@ -133,11 +133,56 @@ document.addEventListener("DOMContentLoaded", () => {
 
     sendBtn.addEventListener("click", sendMessage);
 
-    // Image Upload
+    // Image Upload & Paste & Drag/Drop
     imageFileInput.addEventListener("change", handleFileUpload);
     btnAttachViewport.addEventListener("click", captureAndAttachViewport);
     btnQuickViewport.addEventListener("click", captureAndAttachViewport);
     btnQuickScene.addEventListener("click", querySceneInfo);
+
+    // Clipboard Paste (Ctrl+V) Image Support
+    document.addEventListener("paste", (e) => {
+      const items = (e.clipboardData || window.clipboardData)?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.indexOf("image") !== -1) {
+          const file = item.getAsFile();
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              attachedImages.push(event.target.result);
+              renderAttachmentPreviews();
+            };
+            reader.readAsDataURL(file);
+          }
+        }
+      }
+    });
+
+    // Drag & Drop Image onto Chat
+    const chatMain = document.querySelector(".chat-main");
+    if (chatMain) {
+      chatMain.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        chatMain.style.outline = "2px dashed var(--accent-primary)";
+      });
+      chatMain.addEventListener("dragleave", (e) => {
+        e.preventDefault();
+        chatMain.style.outline = "none";
+      });
+      chatMain.addEventListener("drop", (e) => {
+        e.preventDefault();
+        chatMain.style.outline = "none";
+        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/"));
+        files.forEach(file => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            attachedImages.push(event.target.result);
+            renderAttachmentPreviews();
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+    }
 
     // Quick Prompt Chips
     document.querySelectorAll(".quick-chip").forEach(chip => {

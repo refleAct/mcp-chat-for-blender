@@ -409,3 +409,8 @@ class SessionManager:
             conn.cursor().execute("UPDATE task_queue SET status = 'cancelled' WHERE id = ? AND status = 'pending'", (task_id,))
             conn.commit()
 
+
+# Global session manager instance
+session_mgr = SessionManager()
+
+

@@ -12,9 +12,12 @@ import os
 import sys
 import webbrowser
 import threading
+import mimetypes
+import base64
 import bpy
 from bpy.props import IntProperty, BoolProperty, StringProperty, EnumProperty, FloatProperty
 from bpy.types import Panel, Operator, AddonPreferences
+from bpy_extras.io_utils import ImportHelper
 
 # Ensure current addon directory is in sys.path
 addon_dir = os.path.dirname(os.path.abspath(__file__))
@@ -141,13 +144,17 @@ class MCPCHAT_OT_send_message(Operator):
                 images.append(res["image_base64"])
 
         if image_path and os.path.exists(image_path):
-            import base64
+            mime, _ = mimetypes.guess_type(image_path)
+            if not mime:
+                mime = "image/png"
             try:
                 with open(image_path, "rb") as f:
                     b64 = base64.b64encode(f.read()).decode("utf-8")
-                images.append(f"data:image/png;base64,{b64}")
-            except Exception:
-                pass
+                images.append(f"data:{mime};base64,{b64}")
+                # Clear after attaching to message so subsequent messages don't re-send unless selected
+                scene.mcpchat_image_path = ""
+            except Exception as e:
+                self.report({'WARNING'}, f"Failed to attach image: {e}")
 
         # Clear input field
         scene.mcpchat_prompt = ""
@@ -295,6 +302,39 @@ class MCPCHAT_OT_clear_history(Operator):
 
 
 # ==============================================================================
+# Operators: Local Image Selection
+# ==============================================================================
+
+class MCPCHAT_OT_select_local_image(Operator, ImportHelper):
+    """Select a local image to attach to the chat prompt"""
+    bl_idname = "mcpchat.select_local_image"
+    bl_label = "Select Local Image"
+    bl_icon = 'FILE_IMAGE'
+
+    filter_glob: StringProperty(
+        default="*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif",
+        options={'HIDDEN'}
+    )
+
+    def execute(self, context):
+        if self.filepath and os.path.exists(self.filepath):
+            context.scene.mcpchat_image_path = self.filepath
+            self.report({'INFO'}, f"Attached: {os.path.basename(self.filepath)}")
+        return {'FINISHED'}
+
+
+class MCPCHAT_OT_clear_image(Operator):
+    """Remove attached local image"""
+    bl_idname = "mcpchat.clear_image"
+    bl_label = "Clear Image"
+    bl_icon = 'CANCEL'
+
+    def execute(self, context):
+        context.scene.mcpchat_image_path = ""
+        return {'FINISHED'}
+
+
+# ==============================================================================
 # Operators: Task Queue Controls
 # ==============================================================================
 
@@ -421,8 +461,19 @@ class MCPCHAT_PT_chat_panel(Panel):
         col_input = layout.column(align=True)
         col_input.prop(scene, "mcpchat_prompt", text="")
         
-        row_opts = layout.row(align=True)
-        row_opts.prop(scene, "mcpchat_include_viewport", text="뷰포트 스냅샷 첨부", icon='IMAGE_DATA')
+        # Local Image & Viewport Attachment Box
+        box_attach = layout.box()
+        if scene.mcpchat_image_path and os.path.exists(scene.mcpchat_image_path):
+            row_file = box_attach.row(align=True)
+            fname = os.path.basename(scene.mcpchat_image_path)
+            row_file.label(text=f"첨부: {fname[:24]}", icon='IMAGE_DATA')
+            row_file.operator("mcpchat.clear_image", text="", icon='X')
+        else:
+            row_file = box_attach.row(align=True)
+            row_file.operator("mcpchat.select_local_image", text="로컬 이미지 첨부...", icon='FILE_IMAGE')
+
+        row_vp = box_attach.row(align=True)
+        row_vp.prop(scene, "mcpchat_include_viewport", text="뷰포트 스냅샷도 첨부", icon='RESTRICT_RENDER_OFF')
 
         # Send Button
         btn_label = "보내기 (Chat)"
@@ -561,6 +612,8 @@ classes = (
     MCPCHAT_OT_send_message,
     MCPCHAT_OT_new_session,
     MCPCHAT_OT_clear_history,
+    MCPCHAT_OT_select_local_image,
+    MCPCHAT_OT_clear_image,
     MCPCHAT_OT_toggle_queue,
     MCPCHAT_OT_clear_queue,
     MCPCHAT_OT_setup_claude_cli,
