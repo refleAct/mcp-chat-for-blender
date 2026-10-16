@@ -2,6 +2,11 @@
 
 버전 규칙: 기능 추가 = 0.1 단위, 버그 수정 = 0.0.1 단위 (최대 .999)
 
+## 0.8.6
+- Web UI: English by default with a language selector (English / 한국어 / 中文 / 日本語); the whole UI, dialogs and example prompts are translated
+- Web UI fix: the settings dialog was always visible because `display: flex` overrode the `hidden` attribute, so Save/Cancel appeared to do nothing
+- Web UI: one thin dark scrollbar style for every scrollable area
+
 ## 0.8.5
 - Web settings: every provider field (Custom endpoint / key / model, other keys) is optional; blank model or URL falls back to the provider default; fields are labeled optional
 

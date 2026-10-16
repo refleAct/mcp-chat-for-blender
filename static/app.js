@@ -93,11 +93,11 @@ document.addEventListener("DOMContentLoaded", () => {
         activeMode = pill.dataset.mode;
 
         if (activeMode === "PLAN") {
-          chatTextarea.placeholder = "플랜 모드: 3D 모델링/씬 제작 계획을 수립할 목표를 입력하세요...";
+          chatTextarea.placeholder = "Plan mode: enter the goal you want a 3D modeling/scene plan for...";
         } else if (activeMode === "AUTO") {
-          chatTextarea.placeholder = "오토 모드: 계획 생성 후 작업큐에 자동 등록되어 순차 실행 및 저장됩니다...";
+          chatTextarea.placeholder = "Auto mode: after the plan is generated it is queued automatically, then run and saved in order...";
         } else {
-          chatTextarea.placeholder = "블렌더에 요청할 작업을 입력하세요... (예: 크롬 구체와 붉은 조명 추가)";
+          chatTextarea.placeholder = "Enter what you want Blender to do... (e.g. add a chrome sphere and a red light)";
         }
       });
     });
@@ -111,7 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     btnQueueClear.addEventListener("click", async () => {
-      if (confirm("대기열 작업을 모두 삭제하시겠습니까?")) {
+      if (confirm("Delete all queued tasks?")) {
         await fetch("/api/queue/clear", { method: "POST" });
         fetchQueueStatus();
       }
@@ -225,7 +225,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Quick Prompt Chips
     document.querySelectorAll(".quick-chip").forEach(chip => {
       chip.addEventListener("click", () => {
-        const prompt = chip.getAttribute("data-prompt");
+        const prompt = t(chip.getAttribute("data-prompt"));
         chatTextarea.value = prompt;
         chatTextarea.focus();
         chatTextarea.dispatchEvent(new Event("input"));
@@ -290,9 +290,9 @@ document.addEventListener("DOMContentLoaded", () => {
       item.className = `session-item ${s.id === currentSessionId ? "active" : ""}`;
       item.dataset.id = s.id;
       item.innerHTML = `
-        <span class="session-item-title">${escapeHtml(s.title || "새 대화")}</span>
-        <button class="session-rename-btn" title="이름 변경" style="background:none;border:none;cursor:pointer;padding:2px 4px;font-size:0.8rem;opacity:0.6;">✏️</button>
-        <button class="session-delete-btn" title="삭제">✕</button>
+        <span class="session-item-title">${escapeHtml(s.title || "New chat")}</span>
+        <button class="session-rename-btn" title="Rename" style="background:none;border:none;cursor:pointer;padding:2px 4px;font-size:0.8rem;opacity:0.6;">✏️</button>
+        <button class="session-delete-btn" title="Delete">✕</button>
       `;
 
       item.addEventListener("click", (e) => {
@@ -301,7 +301,7 @@ document.addEventListener("DOMContentLoaded", () => {
           deleteSession(s.id);
         } else if (e.target.classList.contains("session-rename-btn")) {
           e.stopPropagation();
-          renameSession(s.id, s.title || "새 대화");
+          renameSession(s.id, s.title || "New chat");
         } else {
           switchSession(s.id);
           sidebar.classList.remove("open");
@@ -322,15 +322,15 @@ document.addEventListener("DOMContentLoaded", () => {
       tab.dataset.id = s.id;
       tab.innerHTML = `
         <span class="tab-icon">💬</span>
-        <span class="tab-title" title="${escapeHtml(s.title || "새 대화")}">${escapeHtml(s.title || "새 대화")}</span>
-        <button class="tab-rename-btn" title="이름 변경">✏️</button>
-        <button class="tab-close-btn" title="삭제">✕</button>
+        <span class="tab-title" title="${escapeHtml(s.title || "New chat")}">${escapeHtml(s.title || "New chat")}</span>
+        <button class="tab-rename-btn" title="Rename">✏️</button>
+        <button class="tab-close-btn" title="Delete">✕</button>
       `;
 
       tab.addEventListener("click", (e) => {
         if (e.target.classList.contains("tab-rename-btn")) {
           e.stopPropagation();
-          renameSession(s.id, s.title || "새 대화");
+          renameSession(s.id, s.title || "New chat");
         } else if (e.target.classList.contains("tab-close-btn")) {
           e.stopPropagation();
           deleteSession(s.id);
@@ -344,7 +344,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (titleSpan) {
         titleSpan.addEventListener("dblclick", (e) => {
           e.stopPropagation();
-          renameSession(s.id, s.title || "새 대화");
+          renameSession(s.id, s.title || "New chat");
         });
       }
 
@@ -353,7 +353,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function renameSession(sessionId, currentTitle) {
-    const newTitle = prompt("새 세션 이름을 입력하세요:", currentTitle || "");
+    const newTitle = prompt("Enter a new session name:", currentTitle || "");
     if (!newTitle || !newTitle.trim() || newTitle.trim() === currentTitle) return;
 
     try {
@@ -370,7 +370,7 @@ document.addEventListener("DOMContentLoaded", () => {
         await loadSessions();
       }
     } catch (err) {
-      alert("세션 이름 변경 실패: " + err.message);
+      alert("Failed to rename the session: " + err.message);
     }
   }
 
@@ -406,7 +406,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function deleteSession(sessionId) {
-    if (!confirm("이 대화 세션을 삭제하시겠습니까?")) return;
+    if (!confirm("Delete this chat session?")) return;
     try {
       await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
       await loadSessions();
@@ -477,9 +477,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const thinkingRow = document.createElement("div");
     thinkingRow.className = "message-row assistant";
     thinkingRow.id = "temp-thinking-indicator";
-    let statusText = "AI가 블렌더 도구를 호출하고 코드를 실행 중입니다...";
-    if (activeMode === "PLAN") statusText = "AI가 단계별 3D 제작 계획(Plan)을 수립 중입니다...";
-    else if (activeMode === "AUTO") statusText = "AI가 계획 수립 후 작업큐를 자동 가동 중입니다...";
+    let statusText = t("The AI is calling Blender tools and running code...");
+    if (activeMode === "PLAN") statusText = t("The AI is building a step-by-step 3D plan...");
+    else if (activeMode === "AUTO") statusText = t("The AI is planning and starting the task queue automatically...");
 
     thinkingRow.innerHTML = `
       <div class="message-bubble">
@@ -506,7 +506,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await res.json();
         if (data.plan) {
           const plan = data.plan;
-          let planText = `📋 **${plan.plan_title || "작업 계획서"}**\n\n${plan.summary || ""}\n\n`;
+          let planText = `📋 **${plan.plan_title || t("Work plan")}**\n\n${plan.summary || ""}\n\n`;
           (plan.steps || []).forEach(s => {
             planText += `**Step ${s.step_number}: ${s.title}**\n${s.description || ""}\n\`\`\`python\n${s.code || ""}\n\`\`\`\n\n`;
           });
@@ -519,7 +519,7 @@ document.addEventListener("DOMContentLoaded", () => {
           });
           scrollToBottom();
         } else {
-          throw new Error(data.error || "플랜 생성 실패");
+          throw new Error(data.error || t("Plan generation failed"));
         }
 
       } else if (activeMode === "AUTO") {
@@ -535,7 +535,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await res.json();
         if (data.status === "auto_started") {
           const plan = data.plan || {};
-          let replyText = `⚡ **Auto Mode 가동 시작**\n지시가 작업큐 **1건**으로 등록되었습니다. 계획 수립과 단계 실행은 이 작업 안에서 순차 처리되며, 완료 시 .blend 스냅샷과 렌더 이미지가 자동 저장됩니다.`;
+          let replyText = t("⚡ **Auto Mode started**") + "\n" + t("Your instruction was queued as **1 task**. Planning and step execution run in order inside this task, and a .blend snapshot and render image are saved automatically when it finishes.");
           appendMessageUI({
             role: "assistant",
             content: replyText
@@ -543,7 +543,7 @@ document.addEventListener("DOMContentLoaded", () => {
           scrollToBottom();
           fetchQueueStatus();
         } else {
-          throw new Error(data.error || "오토 모드 시작 실패");
+          throw new Error(data.error || t("Failed to start Auto mode"));
         }
 
       } else {
@@ -581,7 +581,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       appendMessageUI({
         role: "assistant",
-        content: `⚠️ 통신 중 오류가 발생했습니다: ${err.message}`
+        content: tf("⚠️ A communication error occurred: {}", err.message)
       });
       scrollToBottom();
     } finally {
@@ -601,7 +601,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (msg.images && msg.images.length > 0) {
       bubbleContent += `<div class="message-images-grid">`;
       msg.images.forEach(imgUrl => {
-        bubbleContent += `<img src="${imgUrl}" class="message-image-thumb" alt="첨부 이미지" onclick="window.open('${imgUrl}')">`;
+        bubbleContent += `<img src="${imgUrl}" class="message-image-thumb" alt="Attached image" onclick="window.open('${imgUrl}')">`;
       });
       bubbleContent += `</div>`;
     }
@@ -611,7 +611,7 @@ document.addEventListener("DOMContentLoaded", () => {
       bubbleContent += `
         <div class="thought-card">
           <div class="thought-header" onclick="this.nextElementSibling.hidden = !this.nextElementSibling.hidden">
-            <span>🧠 AI 심층 추론 과정 (Thinking)</span>
+            <span>🧠 AI deep reasoning (Thinking)</span>
             <span>▼</span>
           </div>
           <div class="thought-content" hidden>${escapeHtml(msg.thought)}</div>
@@ -681,10 +681,10 @@ document.addEventListener("DOMContentLoaded", () => {
         attachedImages.push(data.image_base64);
         renderAttachmentPreviews();
       } else {
-        alert("뷰포트 캡처 실패: " + (data.error || "알 수 없는 오류"));
+        alert("Viewport capture failed: " + (data.error || t("Unknown error")));
       }
     } catch (err) {
-      alert("뷰포트 캡처 요청 중 에러: " + err.message);
+      alert("Error while requesting a viewport capture: " + err.message);
     } finally {
       btnAttachViewport.style.opacity = "1";
     }
@@ -711,11 +711,11 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const res = await fetch("/api/blender/scene");
       const sceneData = await res.json();
-      chatTextarea.value = `현재 블렌더 씬 정보입니다:\n\`\`\`json\n${JSON.stringify(sceneData, null, 2)}\n\`\`\`\n이 구성을 분석해줘.`;
+      chatTextarea.value = t("This is the current Blender scene:") + "\n```json\n" + JSON.stringify(sceneData, null, 2) + "\n```\n" + t("Analyze this setup.");
       chatTextarea.focus();
       chatTextarea.dispatchEvent(new Event("input"));
     } catch (err) {
-      alert("씬 정보 조회 실패: " + err.message);
+      alert("Failed to get scene info: " + err.message);
     }
   }
 
@@ -825,7 +825,7 @@ document.addEventListener("DOMContentLoaded", () => {
       settingsModal.hidden = true;
       fetchQueueStatus();
     } catch (err) {
-      alert("설정 저장 실패: " + err.message);
+      alert("Failed to save settings: " + err.message);
     }
   }
 

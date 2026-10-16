@@ -1,4 +1,4 @@
-# 🧊 MCP Chat for Blender  `v0.8.5`
+# 🧊 MCP Chat for Blender  `v0.8.6`
 
 **English** | [한국어](README.ko.md) | [中文](README.zh.md) | [日本語](README.ja.md)
 
@@ -172,13 +172,13 @@ To control a PC's Blender from Termux on a phone, turn on **LAN access** (token-
 | Language | Add-on (Blender) UI | Web UI |
 |---|---|---|
 | 한국어 | ✅ | ✅ |
-| English | ✅ | ❌ |
-| 中文 (简体) | ✅ | ❌ |
-| 日本語 | ✅ | ❌ |
+| English | ✅ | ✅ |
+| 中文 (简体) | ✅ | ✅ |
+| 日本語 | ✅ | ✅ |
 
 - Choose Auto (follow Blender) / Korean / English / Chinese / Japanese in **Language** at the top of the add-on preferences.
 - All translations live in one table in `i18n.py`; add or fix entries there. Text that is not in the table is shown as written.
-- Tooltips, previously saved chat content, the AI's reply language and the web UI are not translated.
+- Tooltips, previously saved chat content and the AI's reply language are not translated. The web UI has its own language selector in the sidebar (default: English).
 - This README is available in four languages: [English](README.md) · [한국어](README.ko.md) · [中文](README.zh.md) · [日本語](README.ja.md).
 
 ## 7. Structure
@@ -243,10 +243,10 @@ Data location: `~/.config/blender_mcp_chat/` (chat DB, saved .blend/.glb/images)
 
 ## 10. Versioning
 
-- Current version: **0.8.5**
+- Current version: **0.8.6**
 - **New features**: bump by 0.1 (0.8 → 0.9 → 1.0 …)
 - **Bug fixes**: bump by 0.0.1 (0.8.1 → 0.8.2 … up to 0.8.999)
-- Blender's `bl_info` stores it as a tuple such as `(0, 8, 5)`. See [CHANGELOG.md](CHANGELOG.md).
+- Blender's `bl_info` stores it as a tuple such as `(0, 8, 6)`. See [CHANGELOG.md](CHANGELOG.md).
 - Pushing a `v*` tag builds the zip with GitHub Actions and publishes it as a Release automatically.
 - **Releases accumulate, one per version** (older ones are kept). The add-on's **Check for updates** button looks up the *latest* Release and installs it when it is newer than the installed version.
 

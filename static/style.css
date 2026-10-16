@@ -1160,3 +1160,39 @@ body {
     display: none;
   }
 }
+
+/* ==========================================================================
+   Fixes / unified styling
+   ========================================================================== */
+
+/* The HTML `hidden` attribute must win over component display rules (e.g. .modal-backdrop { display: flex }) */
+[hidden] {
+  display: none !important;
+}
+
+/* One scrollbar style for every scrollable area: sessions list, chat, task queue, settings dialog ... */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsla(220, 20%, 45%, 0.55) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: hsla(220, 20%, 45%, 0.55);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: hsla(215, 95%, 60%, 0.7);
+  background-clip: content-box;
+}

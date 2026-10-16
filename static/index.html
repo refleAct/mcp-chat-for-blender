@@ -23,18 +23,18 @@
             <span class="badge-status online" id="server-status-pill">Connected</span>
           </div>
         </div>
-        <button class="icon-btn close-sidebar-btn" id="close-sidebar-btn" aria-label="사이드바 닫기">✕</button>
+        <button class="icon-btn close-sidebar-btn" id="close-sidebar-btn" aria-label="Close sidebar">✕</button>
       </div>
 
       <div class="sidebar-actions">
         <button class="primary-btn new-chat-btn" id="new-chat-btn">
           <span class="btn-icon">＋</span>
-          <span>새 채팅 세션</span>
+          <span>New chat session</span>
         </button>
       </div>
 
       <div class="sessions-list-container">
-        <div class="session-section-title">최근 대화 세션</div>
+        <div class="session-section-title">Recent chat sessions</div>
         <div class="sessions-list" id="sessions-list">
           <!-- Dynamic session items will be rendered here -->
         </div>
@@ -43,7 +43,7 @@
       <div class="sidebar-footer">
         <button class="secondary-btn settings-btn" id="open-settings-btn">
           <span class="btn-icon">⚙️</span>
-          <span>모델 & AI 설정</span>
+          <span>Model & AI settings</span>
         </button>
       </div>
     </aside>
@@ -56,7 +56,7 @@
       <!-- Top Navigation Header -->
       <header class="chat-header">
         <div class="header-left">
-          <button class="icon-btn menu-btn" id="toggle-sidebar-btn" aria-label="메뉴 열기">
+          <button class="icon-btn menu-btn" id="toggle-sidebar-btn" aria-label="Open menu">
             <span class="hamburger-bar"></span>
             <span class="hamburger-bar"></span>
             <span class="hamburger-bar"></span>
@@ -64,7 +64,7 @@
           <div class="active-session-info">
             <div class="session-title-row">
               <h1 class="session-title" id="current-session-title">Blender AI Assistant</h1>
-              <button class="mini-rename-btn" id="btn-rename-session" title="세션 이름 변경">✏️</button>
+              <button class="mini-rename-btn" id="btn-rename-session" title="Rename session">✏️</button>
             </div>
             <div class="session-meta">
               <span class="model-badge" id="current-model-badge">claude-3.5-sonnet</span>
@@ -74,13 +74,13 @@
         </div>
 
         <div class="header-right">
-          <button class="ghost-btn tool-btn" id="btn-quick-viewport" title="블렌더 화면 캡처">
+          <button class="ghost-btn tool-btn" id="btn-quick-viewport" title="Capture Blender screen">
             <span class="btn-icon">📸</span>
-            <span class="btn-text">뷰포트 캡처</span>
+            <span class="btn-text">Viewport capture</span>
           </button>
-          <button class="ghost-btn tool-btn" id="btn-quick-scene" title="현재 씬 정보 조회">
+          <button class="ghost-btn tool-btn" id="btn-quick-scene" title="Get current scene info">
             <span class="btn-icon">🔍</span>
-            <span class="btn-text">씬 정보</span>
+            <span class="btn-text">Scene info</span>
           </button>
         </div>
       </header>
@@ -90,8 +90,8 @@
         <div class="tabs-scroll-container" id="session-tabs-list">
           <!-- Dynamic session tabs rendered here -->
         </div>
-        <button class="add-tab-btn" id="btn-add-session-tab" title="새 세션 탭 추가">
-          <span>＋ 새 탭</span>
+        <button class="add-tab-btn" id="btn-add-session-tab" title="Add a new session tab">
+          <span>＋ New tab</span>
         </button>
       </nav>
 
@@ -100,21 +100,21 @@
         <!-- Dynamic chat messages inserted here -->
         <div class="welcome-card" id="welcome-card">
           <div class="welcome-icon">🎨</div>
-          <h2>안드로이드 블렌더 AI 어시스턴트</h2>
-          <p>프롬프트를 입력하면 AI가 직접 파이썬 스크립트를 작성하여 블렌더 3D 씬을 생성하고 조작합니다.</p>
+          <h2>Android Blender AI assistant</h2>
+          <p>Enter a prompt and the AI writes Python scripts to create and edit the Blender 3D scene.</p>
           
           <div class="quick-prompts-grid">
-            <button class="quick-chip" data-prompt="간단한 사이버펑크 네온 큐브와 조명 세트를 만들어줘">
-              🏙️ 사이버펑크 네온 큐브 생성
+            <button class="quick-chip" data-prompt="Create a simple cyberpunk neon cube with a lighting set">
+              🏙️ Create a cyberpunk neon cube
             </button>
-            <button class="quick-chip" data-prompt="현재 씬의 모든 오브젝트 목록과 재질 정보를 분석해줘">
-              📊 씬 분석 및 요약
+            <button class="quick-chip" data-prompt="List all objects and material info in the current scene and analyze it">
+              📊 Analyze and summarize the scene
             </button>
-            <button class="quick-chip" data-prompt="저폴리곤(Low-poly) 소나무와 지형을 바닥에 생성해줘">
-              🌲 저폴리곤 숲 지형 생성
+            <button class="quick-chip" data-prompt="Create low-poly pine trees and terrain on the ground">
+              🌲 Create low-poly forest terrain
             </button>
-            <button class="quick-chip" data-prompt="현재 뷰포트 화면을 캡처해서 구도를 평가해줘">
-              📸 뷰포트 캡처 및 구도 평가
+            <button class="quick-chip" data-prompt="Capture the current viewport and review the composition">
+              📸 Capture the viewport and review the composition
             </button>
           </div>
         </div>
@@ -125,15 +125,15 @@
         <!-- Mode Switcher & Queue Bar -->
         <div class="control-toolbar">
           <div class="mode-pills">
-            <button class="mode-pill active" data-mode="CHAT" title="일반 대화 및 직접 실행">💬 Chat</button>
-            <button class="mode-pill" data-mode="PLAN" title="사전 작업 계획 수립">📋 Plan</button>
-            <button class="mode-pill" data-mode="AUTO" title="계획 수립 후 작업큐 자동 순차 실행">⚡ Auto</button>
+            <button class="mode-pill active" data-mode="CHAT" title="Chat and run directly">💬 Chat</button>
+            <button class="mode-pill" data-mode="PLAN" title="Make a plan first">📋 Plan</button>
+            <button class="mode-pill" data-mode="AUTO" title="Plan, then run the task queue automatically in order">⚡ Auto</button>
           </div>
-          <div class="queue-status-pill" id="queue-status-pill" title="클릭하여 작업큐 관리">
+          <div class="queue-status-pill" id="queue-status-pill" title="Click to manage the task queue">
             <span class="queue-dot"></span>
             <span id="queue-text">Queue: 0 | 2.0s</span>
-            <button class="mini-icon-btn" id="btn-queue-pause" title="일시정지/재개">⏸️</button>
-            <button class="mini-icon-btn" id="btn-queue-clear" title="큐 비우기">🗑️</button>
+            <button class="mini-icon-btn" id="btn-queue-pause" title="Pause/resume">⏸️</button>
+            <button class="mini-icon-btn" id="btn-queue-clear" title="Clear queue">🗑️</button>
           </div>
         </div>
 
@@ -143,11 +143,11 @@
         <!-- Input Box -->
         <div class="input-card">
           <div class="input-actions-left">
-            <label class="action-circle-btn file-upload-label" title="이미지/사진 첨부">
+            <label class="action-circle-btn file-upload-label" title="Attach image/photo">
               <input type="file" id="image-file-input" accept="image/*" multiple hidden>
               <span>📷</span>
             </label>
-            <button class="action-circle-btn" id="btn-attach-viewport" title="현재 3D 뷰포트 캡처 후 첨부">
+            <button class="action-circle-btn" id="btn-attach-viewport" title="Capture the current 3D viewport and attach it">
               <span>🖼️</span>
             </button>
           </div>
@@ -155,18 +155,18 @@
           <textarea 
             id="chat-textarea" 
             class="chat-textarea" 
-            placeholder="블렌더에 요청할 작업을 입력하세요... (예: 크롬 구체와 붉은 조명 추가)" 
+            placeholder="Enter what you want Blender to do... (e.g. add a chrome sphere and a red light)" 
             rows="1"
           ></textarea>
 
-          <button class="send-btn" id="send-btn" aria-label="메시지 전송">
+          <button class="send-btn" id="send-btn" aria-label="Send message">
             <svg viewBox="0 0 24 24" fill="none" class="send-icon">
               <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="currentColor"/>
             </svg>
           </button>
         </div>
         <div class="input-hint">
-          <span>💡 모바일 카메라/갤러리 사진 첨부 가능 · Termux Claude Code / agy CLI (MCP) 연동 지원</span>
+          <span>💡 You can attach photos from the mobile camera/gallery · Termux Claude Code / agy CLI (MCP) supported</span>
         </div>
       </footer>
     </main>
@@ -175,12 +175,12 @@
     <div class="modal-backdrop" id="settings-modal" hidden>
       <div class="modal-card">
         <div class="modal-header">
-          <h3>AI 모델 및 엔드포인트 설정</h3>
+          <h3>AI model and endpoint settings</h3>
           <button class="icon-btn modal-close-btn" id="close-settings-btn">✕</button>
         </div>
 
         <div class="modal-body">
-          <p class="form-hint" style="margin:0 0 12px">API 키는 <b>선택 사항</b>입니다. 비워 두면 PC에 설치된 <b>Claude Code</b> CLI(없으면 Codex/agy)로 자동 처리됩니다.</p>
+          <p class="form-hint" style="margin:0 0 12px">API keys are optional. If left empty, requests are handled automatically by the Claude Code CLI installed on the PC (or Codex/agy if it is missing).</p>
           <!-- Provider Tabs -->
           <div class="provider-tabs">
             <button class="tab-btn active" data-provider="openrouter">OpenRouter</button>
@@ -192,26 +192,26 @@
           <!-- OpenRouter Form -->
           <div class="provider-form" id="form-openrouter">
             <div class="form-group">
-              <label for="cfg-openrouter-key">OpenRouter API Key <span class="form-hint">(선택)</span></label>
+              <label for="cfg-openrouter-key">OpenRouter API Key <span class="form-hint">(optional)</span></label>
               <input type="password" id="cfg-openrouter-key" placeholder="sk-or-v1-..." class="form-input">
             </div>
             <div class="form-group">
               <label for="cfg-openrouter-model">Model Name</label>
               <input type="text" id="cfg-openrouter-model" value="anthropic/claude-3.5-sonnet" class="form-input">
-              <span class="form-help">추천: anthropic/claude-3.5-sonnet, openai/gpt-4o, deepseek/deepseek-r1</span>
+              <span class="form-help">Recommended: anthropic/claude-3.5-sonnet, openai/gpt-4o, deepseek/deepseek-r1</span>
             </div>
           </div>
 
           <!-- NVIDIA NIM Form -->
           <div class="provider-form" id="form-nvidia_nim" hidden>
             <div class="form-group">
-              <label for="cfg-nvidia-key">NVIDIA NIM API Key <span class="form-hint">(선택)</span></label>
+              <label for="cfg-nvidia-key">NVIDIA NIM API Key <span class="form-hint">(optional)</span></label>
               <input type="password" id="cfg-nvidia-key" placeholder="nvapi-..." class="form-input">
             </div>
             <div class="form-group">
               <label for="cfg-nvidia-model">Model Name</label>
               <input type="text" id="cfg-nvidia-model" value="meta/llama-3.3-70b-instruct" class="form-input">
-              <span class="form-help">추천: meta/llama-3.3-70b-instruct, nvidia/llama-3.1-nemotron-70b-instruct</span>
+              <span class="form-help">Recommended: meta/llama-3.3-70b-instruct, nvidia/llama-3.1-nemotron-70b-instruct</span>
             </div>
           </div>
 
@@ -220,7 +220,7 @@
             <div class="form-group">
               <label for="cfg-local-url">Local Base URL</label>
               <input type="text" id="cfg-local-url" value="http://127.0.0.1:11434/v1" class="form-input">
-              <span class="form-help">Termux 내부 또는 동일 Wi-Fi의 Ollama, LM Studio, vLLM 주소</span>
+              <span class="form-help">Address of Ollama, LM Studio or vLLM inside Termux or on the same Wi-Fi</span>
             </div>
             <div class="form-group">
               <label for="cfg-local-model">Local Model</label>
@@ -231,15 +231,15 @@
           <!-- Custom OpenAI-compatible Form -->
           <div class="provider-form" id="form-custom" hidden>
             <div class="form-group">
-              <label for="cfg-custom-url">Endpoint Base URL <span class="form-hint">(선택 · 비우면 기본값)</span></label>
+              <label for="cfg-custom-url">Endpoint Base URL <span class="form-hint">(optional · blank = default)</span></label>
               <input type="text" id="cfg-custom-url" placeholder="https://api.openai.com/v1" class="form-input">
             </div>
             <div class="form-group">
-              <label for="cfg-custom-key">API Key <span class="form-hint">(선택)</span></label>
+              <label for="cfg-custom-key">API Key <span class="form-hint">(optional)</span></label>
               <input type="password" id="cfg-custom-key" class="form-input">
             </div>
             <div class="form-group">
-              <label for="cfg-custom-model">Model Name <span class="form-hint">(선택 · 비우면 gpt-4o)</span></label>
+              <label for="cfg-custom-model">Model Name <span class="form-hint">(optional · blank = gpt-4o)</span></label>
               <input type="text" id="cfg-custom-model" placeholder="gpt-4o" class="form-input">
             </div>
           </div>
@@ -249,25 +249,25 @@
           <!-- Reasoning & Inference Performance Settings -->
           <div class="form-row">
             <div class="form-group half">
-              <label for="cfg-reasoning-effort">추론 강도 (Reasoning)</label>
+              <label for="cfg-reasoning-effort">Reasoning effort</label>
               <select id="cfg-reasoning-effort" class="form-select">
-                <option value="none">사용 안 함 (기본)</option>
-                <option value="low">Low (빠른 추론)</option>
-                <option value="medium" selected>Medium (균형)</option>
-                <option value="high">High (심층 추론)</option>
+                <option value="none">Off (default)</option>
+                <option value="low">Low (fast reasoning)</option>
+                <option value="medium" selected>Medium (balanced)</option>
+                <option value="high">High (deep reasoning)</option>
               </select>
-              <span class="form-help">o1, o3-mini, DeepSeek R1 등에 적용</span>
+              <span class="form-help">Applies to o1, o3-mini, DeepSeek R1, etc.</span>
             </div>
 
             <div class="form-group half">
-              <label for="cfg-thinking-budget">Claude Thinking 토큰</label>
+              <label for="cfg-thinking-budget">Claude thinking tokens</label>
               <input type="number" id="cfg-thinking-budget" value="2048" step="1024" min="0" max="64000" class="form-input">
-              <span class="form-help">Claude 3.7 Sonnet 확장 사고 예산</span>
+              <span class="form-help">Extended thinking budget for Claude 3.7 Sonnet</span>
             </div>
           </div>
 
           <div class="form-group">
-            <label for="cfg-temperature">Temperature (창의성)</label>
+            <label for="cfg-temperature">Temperature (creativity)</label>
             <div class="range-box">
               <input type="range" id="cfg-temperature" min="0.0" max="1.5" step="0.1" value="0.7">
               <span id="cfg-temperature-val">0.7</span>
@@ -276,38 +276,39 @@
 
           <div class="form-row">
             <div class="form-group half">
-              <label for="cfg-queue-delay">작업큐 전역 딜레이 (초)</label>
+              <label for="cfg-queue-delay">Global queue delay (s)</label>
               <input type="number" id="cfg-queue-delay" value="60" step="1" min="0" max="3600" class="form-input">
-              <span class="form-help">연속 작업 사이 대기시간 (발열 방지)</span>
+              <span class="form-help">Wait time between consecutive tasks (prevents overheating)</span>
             </div>
             <div class="form-group half">
-              <label for="cfg-port">서버 포트</label>
+              <label for="cfg-port">Server port</label>
               <input type="number" id="cfg-port" value="8000" class="form-input">
             </div>
           </div>
 
           <div class="form-group">
-            <label>자동 저장 옵션 (Auto-Save)</label>
+            <label>Auto-save options</label>
             <div style="display: flex; gap: 16px; margin-top: 4px;">
               <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; font-weight:normal; cursor:pointer;">
-                <input type="checkbox" id="cfg-auto-blend" checked> .blend 스냅샷 자동 저장
+                <input type="checkbox" id="cfg-auto-blend" checked> Auto-save .blend snapshot
               </label>
               <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; font-weight:normal; cursor:pointer;">
-                <input type="checkbox" id="cfg-auto-image" checked> 렌더 이미지 자동 저장
+                <input type="checkbox" id="cfg-auto-image" checked> Auto-save render image
               </label>
             </div>
           </div>
         </div>
 
         <div class="modal-footer">
-          <button class="secondary-btn" id="cancel-settings-btn">취소</button>
-          <button class="primary-btn" id="save-settings-btn">설정 저장</button>
+          <button class="secondary-btn" id="cancel-settings-btn">Cancel</button>
+          <button class="primary-btn" id="save-settings-btn">Save settings</button>
         </div>
       </div>
     </div>
 
   </div>
 
+  <script src="/static/i18n.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>
