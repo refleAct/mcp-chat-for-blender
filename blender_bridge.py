@@ -248,6 +248,64 @@ class BlenderBridge:
             return res.get("result", {})
         return {"error": res.get("error", "Failed to capture viewport")}
 
+    def save_blend_snapshot(self, custom_path=None) -> dict:
+        """Saves a copy of the active .blend file to the output directory."""
+        def _save():
+            home = os.path.expanduser("~")
+            output_dir = os.path.join(home, ".config", "blender_mcp_chat", "output", "blends")
+            os.makedirs(output_dir, exist_ok=True)
+
+            filename = f"snapshot_{int(time.time())}.blend"
+            target_path = custom_path or os.path.join(output_dir, filename)
+
+            try:
+                # Save a copy without changing active file path
+                bpy.ops.wm.save_as_mainfile(filepath=target_path, copy=True)
+                return {"status": "success", "filepath": target_path}
+            except Exception as e:
+                return {"status": "error", "error": str(e)}
+
+        res = self.run_in_main_thread(_save, timeout=10.0)
+        if res.get("success"):
+            return res.get("result", {})
+        return {"status": "error", "error": res.get("error", "Failed to save blend snapshot")}
+
+    def capture_and_save_viewport(self, custom_path=None) -> dict:
+        """Captures viewport and permanently saves to the output directory."""
+        def _save_img():
+            home = os.path.expanduser("~")
+            output_dir = os.path.join(home, ".config", "blender_mcp_chat", "output", "renders")
+            os.makedirs(output_dir, exist_ok=True)
+
+            filename = f"render_{int(time.time())}.png"
+            target_path = custom_path or os.path.join(output_dir, filename)
+
+            # Use OpenGL render for fast and true-to-viewport capture
+            try:
+                orig_path = bpy.context.scene.render.filepath
+                orig_format = bpy.context.scene.render.image_settings.file_format
+
+                bpy.context.scene.render.filepath = target_path
+                bpy.context.scene.render.image_settings.file_format = 'PNG'
+
+                bpy.ops.render.opengl(write_still=True, view_context=True)
+
+                bpy.context.scene.render.filepath = orig_path
+                bpy.context.scene.render.image_settings.file_format = orig_format
+
+                return {"status": "success", "filepath": target_path}
+            except Exception as e:
+                try:
+                    bpy.ops.screen.screenshot(filepath=target_path)
+                    return {"status": "success", "filepath": target_path}
+                except Exception as inner_e:
+                    return {"status": "error", "error": f"{e} / {inner_e}"}
+
+        res = self.run_in_main_thread(_save_img, timeout=15.0)
+        if res.get("success"):
+            return res.get("result", {})
+        return {"status": "error", "error": res.get("error", "Failed to capture and save viewport")}
+
 
 # Global bridge singleton
 bridge = BlenderBridge()

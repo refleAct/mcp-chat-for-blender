@@ -45,6 +45,37 @@ MCP_TOOLS = [
                 }
             }
         }
+    },
+    {
+        "name": "enqueue_blender_task",
+        "description": "Add a Python code execution or render task to the Blender background Task Queue. The task will be executed sequentially with the global delay and automatically saved (.blend & render image).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "Descriptive title for the task (e.g. 'Build Base Room', 'Add Neon Materials')"
+                },
+                "code": {
+                    "type": "string",
+                    "description": "Python code using bpy to execute for this task"
+                },
+                "task_type": {
+                    "type": "string",
+                    "enum": ["code", "render"],
+                    "description": "Task type (default: code)"
+                }
+            },
+            "required": ["title", "code"]
+        }
+    },
+    {
+        "name": "get_queue_status",
+        "description": "Check the status of the Blender background Task Queue: pending tasks count, active running task, global delay in seconds, and auto-save state.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {}
+        }
     }
 ]
 
@@ -197,6 +228,45 @@ class MCPHandler:
                     ],
                     "isError": True
                 }
+
+        elif name == "enqueue_blender_task":
+            title = args.get("title", "Queued Task")
+            code = args.get("code", "")
+            task_type = args.get("task_type", "code")
+
+            from session_manager import session_mgr
+            from task_queue import task_queue
+
+            task_queue.start() # Ensure queue worker is running
+            created = session_mgr.enqueue_task(
+                title=title,
+                task_type=task_type,
+                payload={"code": code}
+            )
+
+            status = task_queue.get_status()
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Task enqueued: '{title}' (ID: {created['id']})\nQueue: {status['counts']['pending']} pending, Delay between tasks: {status['delay_seconds']}s"
+                    }
+                ],
+                "isError": False
+            }
+
+        elif name == "get_queue_status":
+            from task_queue import task_queue
+            status = task_queue.get_status()
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(status, indent=2, ensure_ascii=False)
+                    }
+                ],
+                "isError": False
+            }
 
         else:
             return {

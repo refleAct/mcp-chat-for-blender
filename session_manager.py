@@ -75,6 +75,24 @@ class SessionManager:
             )
             """)
 
+            # Task Queue table
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS task_queue (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                task_type TEXT NOT NULL, -- 'code' | 'prompt' | 'render'
+                payload TEXT NOT NULL, -- JSON string
+                status TEXT NOT NULL, -- 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
+                output_blend TEXT,
+                output_image TEXT,
+                result_text TEXT,
+                error TEXT,
+                created_at REAL NOT NULL,
+                started_at REAL,
+                completed_at REAL
+            )
+            """)
+
             # Config key-value store
             cursor.execute("""
             CREATE TABLE IF NOT EXISTS settings (
@@ -103,7 +121,11 @@ class SessionManager:
             "reasoning_effort": "medium", # low | medium | high
             "thinking_budget": "2048",
             "temperature": "0.7",
-            "port": "8000"
+            "port": "8000",
+            # Queue & Auto-save settings
+            "queue_delay_seconds": "2.0",
+            "auto_save_blend": "true",
+            "auto_save_image": "true"
         }
         for k, v in defaults.items():
             if self.get_setting(k) is None:
@@ -278,6 +300,112 @@ class SessionManager:
             "created_at": now
         }
 
+    # -------------------------------------------------------------
+    # Task Queue Management
+    # -------------------------------------------------------------
 
-# Global session manager instance
-session_mgr = SessionManager()
+    def enqueue_task(self, title: str, task_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        task_id = str(uuid.uuid4())
+        now = time.time()
+        payload_str = json.dumps(payload, ensure_ascii=False)
+
+        with self._get_connection() as conn:
+            conn.cursor().execute("""
+                INSERT INTO task_queue (id, title, task_type, payload, status, created_at)
+                VALUES (?, ?, ?, ?, 'pending', ?)
+            """, (task_id, title, task_type, payload_str, now))
+            conn.commit()
+
+        return self.get_task(task_id)
+
+    def enqueue_batch_tasks(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        created = []
+        now = time.time()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            for t in tasks:
+                t_id = str(uuid.uuid4())
+                payload_str = json.dumps(t.get("payload", {}), ensure_ascii=False)
+                cursor.execute("""
+                    INSERT INTO task_queue (id, title, task_type, payload, status, created_at)
+                    VALUES (?, ?, ?, ?, 'pending', ?)
+                """, (t_id, t.get("title", "Queued Task"), t.get("task_type", "code"), payload_str, now))
+                created.append(t_id)
+            conn.commit()
+        return [self.get_task(tid) for tid in created]
+
+    def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            row = conn.cursor().execute("SELECT * FROM task_queue WHERE id = ?", (task_id,)).fetchone()
+            if not row:
+                return None
+            item = dict(row)
+            try:
+                item["payload"] = json.loads(item["payload"])
+            except Exception:
+                pass
+            return item
+
+    def get_next_pending_task(self) -> Optional[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            row = conn.cursor().execute(
+                "SELECT * FROM task_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1"
+            ).fetchone()
+            if not row:
+                return None
+            item = dict(row)
+            try:
+                item["payload"] = json.loads(item["payload"])
+            except Exception:
+                pass
+            return item
+
+    def update_task_status(self, task_id: str, status: str, 
+                           output_blend: Optional[str] = None,
+                           output_image: Optional[str] = None,
+                           result_text: Optional[str] = None,
+                           error: Optional[str] = None):
+        now = time.time()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            if status == "running":
+                cursor.execute("UPDATE task_queue SET status = ?, started_at = ? WHERE id = ?", (status, now, task_id))
+            elif status in ("completed", "failed", "cancelled"):
+                cursor.execute("""
+                    UPDATE task_queue 
+                    SET status = ?, output_blend = ?, output_image = ?, result_text = ?, error = ?, completed_at = ?
+                    WHERE id = ?",
+                """, (status, output_blend, output_image, result_text, error, now, task_id))
+            else:
+                cursor.execute("UPDATE task_queue SET status = ? WHERE id = ?", (status, task_id))
+            conn.commit()
+
+    def list_queue_tasks(self, limit: int = 50) -> List[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            rows = conn.cursor().execute(
+                "SELECT * FROM task_queue ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+            result = []
+            for r in rows:
+                item = dict(r)
+                try:
+                    item["payload"] = json.loads(item["payload"])
+                except Exception:
+                    pass
+                result.append(item)
+            return result
+
+    def clear_queue(self, status_filter: Optional[str] = None):
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            if status_filter:
+                cursor.execute("DELETE FROM task_queue WHERE status = ?", (status_filter,))
+            else:
+                cursor.execute("DELETE FROM task_queue")
+            conn.commit()
+
+    def cancel_task(self, task_id: str):
+        with self._get_connection() as conn:
+            conn.cursor().execute("UPDATE task_queue SET status = 'cancelled' WHERE id = ? AND status = 'pending'", (task_id,))
+            conn.commit()
+

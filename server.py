@@ -17,6 +17,7 @@ from blender_bridge import bridge
 from session_manager import session_mgr
 from llm_client import LLMClient
 from mcp_handler import mcp_handler
+from task_queue import task_queue
 
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
@@ -112,6 +113,15 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
         elif path == "/api/blender/viewport":
             shot = bridge.capture_viewport()
             self._send_json(200, shot)
+            return
+
+        elif path == "/api/queue":
+            status = task_queue.get_status()
+            tasks = session_mgr.list_queue_tasks(limit=100)
+            self._send_json(200, {
+                "status": status,
+                "tasks": tasks
+            })
             return
 
         # 3. MCP SSE Endpoint (for SSE-compatible MCP clients)
@@ -282,6 +292,116 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
             self._send_json(200, res)
             return
 
+        # 6. REST API: Task Queue Controls
+        elif path == "/api/queue":
+            title = body.get("title", "Queued Task")
+            task_type = body.get("task_type", "code")
+            payload = body.get("payload", {})
+            task_queue.start()
+            new_task = session_mgr.enqueue_task(title=title, task_type=task_type, payload=payload)
+            self._send_json(201, {"task": new_task, "status": task_queue.get_status()})
+            return
+
+        elif path == "/api/queue/batch":
+            tasks = body.get("tasks", [])
+            task_queue.start()
+            created = session_mgr.enqueue_batch_tasks(tasks)
+            self._send_json(201, {"tasks": created, "status": task_queue.get_status()})
+            return
+
+        elif path == "/api/queue/clear":
+            session_mgr.clear_queue()
+            self._send_json(200, {"status": "cleared", "queue_status": task_queue.get_status()})
+            return
+
+        elif path == "/api/queue/pause":
+            task_queue.pause()
+            self._send_json(200, {"status": "paused", "queue_status": task_queue.get_status()})
+            return
+
+        elif path == "/api/queue/resume":
+            task_queue.resume()
+            task_queue.start()
+            self._send_json(200, {"status": "resumed", "queue_status": task_queue.get_status()})
+            return
+
+        # 7. Plan Mode Endpoint
+        elif path == "/api/plan":
+            prompt = body.get("prompt", "").strip()
+            if not prompt:
+                self._send_json(400, {"error": "Prompt is required"})
+                return
+
+            settings = session_mgr.get_all_settings()
+            provider = body.get("provider") or settings.get("active_provider", "openrouter")
+            model = body.get("model") or settings.get(f"{provider}_model", "anthropic/claude-3.5-sonnet")
+            api_key = settings.get(f"{provider}_api_key", "")
+            base_url = settings.get(f"{provider}_base_url", "")
+
+            client = LLMClient({
+                "provider": provider,
+                "api_key": api_key,
+                "base_url": base_url,
+                "model": model,
+                "reasoning_effort": settings.get("reasoning_effort", "medium")
+            })
+
+            try:
+                plan = client.generate_plan(prompt)
+                self._send_json(200, {"status": "success", "plan": plan})
+            except Exception as e:
+                self._send_json(500, {"error": f"Plan generation failed: {str(e)}"})
+            return
+
+        # 8. Auto Mode Endpoint
+        elif path == "/api/auto":
+            prompt = body.get("prompt", "").strip()
+            if not prompt:
+                self._send_json(400, {"error": "Prompt is required"})
+                return
+
+            settings = session_mgr.get_all_settings()
+            provider = body.get("provider") or settings.get("active_provider", "openrouter")
+            model = body.get("model") or settings.get(f"{provider}_model", "anthropic/claude-3.5-sonnet")
+            api_key = settings.get(f"{provider}_api_key", "")
+            base_url = settings.get(f"{provider}_base_url", "")
+
+            client = LLMClient({
+                "provider": provider,
+                "api_key": api_key,
+                "base_url": base_url,
+                "model": model,
+                "reasoning_effort": settings.get("reasoning_effort", "medium")
+            })
+
+            try:
+                # 1. Generate plan
+                plan = client.generate_plan(prompt)
+                steps = plan.get("steps", [])
+
+                # 2. Convert steps to queue tasks
+                batch_tasks = []
+                for s in steps:
+                    batch_tasks.append({
+                        "title": s.get("title", f"Step {s.get('step_number', 1)}"),
+                        "task_type": s.get("task_type", "code"),
+                        "payload": {"code": s.get("code", "")}
+                    })
+
+                # 3. Add to queue & start worker
+                task_queue.start()
+                enqueued = session_mgr.enqueue_batch_tasks(batch_tasks)
+
+                self._send_json(200, {
+                    "status": "auto_started",
+                    "plan": plan,
+                    "enqueued_count": len(enqueued),
+                    "queue_status": task_queue.get_status()
+                })
+            except Exception as e:
+                self._send_json(500, {"error": f"Auto mode execution failed: {str(e)}"})
+            return
+
         self._send_json(404, {"error": f"Path not found: {path}"})
 
     # -------------------------------------------------------------
@@ -379,6 +499,7 @@ class BlenderServerManager:
             self.server_thread = threading.Thread(target=self.server.serve_forever, daemon=True)
             self.server_thread.start()
             self.is_running = True
+            task_queue.start() # Start task queue worker
             return True, f"Blender MCP Chat Server started on http://127.0.0.1:{self.port}"
         except Exception as e:
             self.is_running = False
@@ -389,6 +510,7 @@ class BlenderServerManager:
             return True, "Server is not running"
 
         try:
+            task_queue.stop() # Stop task queue worker
             if self.server:
                 self.server.shutdown()
                 self.server.server_close()

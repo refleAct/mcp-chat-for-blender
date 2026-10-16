@@ -311,3 +311,87 @@ class LLMClient:
             "tool_events": collected_tool_events,
             "captured_images": captured_images
         }
+
+    def generate_plan(self, user_prompt: str, context_messages: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+        """
+        Decomposes a user's 3D request into a structured multi-step execution plan
+        ready for the Task Queue.
+        """
+        plan_system = """You are a senior 3D Technical Director and Blender Python architect.
+Your role is PLAN MODE: Decompose the user's 3D modeling/rendering request into clean, sequential, executable steps.
+For each step, provide clean, self-contained Blender Python code (using bpy).
+
+You MUST output ONLY a valid JSON object matching this schema (no surrounding text or commentary):
+{
+  "plan_title": "Short title of the plan",
+  "summary": "High level overview of what will be built",
+  "steps": [
+    {
+      "step_number": 1,
+      "title": "Step title (e.g. Create Base Geometry & Collections)",
+      "description": "Explanation of this step",
+      "task_type": "code",
+      "code": "# Python code using bpy\\n..."
+    }
+  ]
+}
+Each step's code must be robust, handle existing objects if needed, and advance the scene sequentially."""
+
+        messages = [
+            {"role": "system", "content": plan_system},
+            {"role": "user", "content": f"Please create a structured step-by-step Blender plan for: {user_prompt}"}
+        ]
+
+        model = self.config.get("model", "anthropic/claude-3.5-sonnet")
+        temperature = 0.3  # Low temperature for precise JSON structuring
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature
+        }
+
+        # Reasonings for o1 / DeepSeek / Claude
+        if self.config.get("reasoning_effort") in ("low", "medium", "high"):
+            payload["reasoning_effort"] = self.config.get("reasoning_effort")
+
+        data_bytes = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(self.base_url, data=data_bytes, headers=self.headers, method="POST")
+        
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+
+        with urllib.request.urlopen(req, context=ctx, timeout=120) as resp:
+            resp_body = resp.read().decode("utf-8")
+            raw_data = json.loads(resp_body)
+            content_str = raw_data.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+            # Extract JSON block if wrapped in markdown
+            content_str = content_str.strip()
+            if content_str.startswith("```json"):
+                content_str = content_str[7:]
+            elif content_str.startswith("```"):
+                content_str = content_str[3:]
+            if content_str.endswith("```"):
+                content_str = content_str[:-3]
+            content_str = content_str.strip()
+
+            try:
+                parsed_plan = json.loads(content_str)
+                return parsed_plan
+            except Exception:
+                # Fallback if json parsing fails
+                return {
+                    "plan_title": "Execution Plan",
+                    "summary": "Plan generated from request",
+                    "steps": [
+                        {
+                            "step_number": 1,
+                            "title": "Execute Complete Request",
+                            "description": "Direct execution fallback",
+                            "task_type": "code",
+                            "code": content_str
+                        }
+                    ]
+                }
+
