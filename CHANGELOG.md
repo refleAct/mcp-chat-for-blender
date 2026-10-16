@@ -2,6 +2,10 @@
 
 버전 규칙: 기능 추가 = 0.1 단위, 버그 수정 = 0.0.1 단위 (최대 .999)
 
+## 0.8.2
+- GitHub Actions: pushing a `v*` tag builds the add-on zip and publishes it to Releases automatically
+- Install guide: use the Releases zip, not GitHub's "Source code (zip)" (that one fails with `No module named 'mcp-chat-for-blender-0'`)
+
 ## 0.8.1
 - 큐 패널: 자동 저장 토글(.blend 스냅샷 / 뷰포트 이미지)을 저장 위치 설정 아래로 이동
 - 채팅 히스토리 기본 높이 5줄, 한글 폭 기준 줄바꿈(말줄임 방지)

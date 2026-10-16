@@ -7,3 +7,5 @@ __pycache__/
 .DS_Store
 Thumbs.db
 .vault/
+dist/
+RELEASE_NOTES.md

@@ -1,7 +1,7 @@
 bl_info = {
     "name": "MCP Chat for Blender (Android & Termux & PC)",
     "author": "Antigravity & Blender Community",
-    "version": (0, 8, 1),
+    "version": (0, 8, 2),
     "blender": (3, 0, 0),
     "location": "3D Viewport > Sidebar > MCP Chat",
     "description": "Embedded In-Blender Chat with 3 Session Tabs, Up to 3 Images, 8-row Scroll, Plan/Auto Mode, Claude Code & agy CLI Integration",

@@ -8,8 +8,56 @@ Excludes .git, __pycache__, .pyc, and scratch files.
 """
 
 import os
+import sys
 import shutil
 import zipfile
+
+INCLUDE_FILES = [
+    "__init__.py",
+    "blender_bridge.py",
+    "cli_runner.py",
+    "guidelines.py",
+    "i18n.py",
+    "secrets_store.py",
+    "updater.py",
+    "termux_agent.py",
+    "llm_client.py",
+    "mcp_bridge.py",
+    "mcp_handler.py",
+    "server.py",
+    "session_manager.py",
+    "task_queue.py",
+    "README.md",
+    "install_termux.sh",
+]
+INCLUDE_DIRS = ["static"]
+
+def package_ci(out_dir="dist"):
+    """CI build: dist/mcp-chat-for-blender-vX.Y.Z.zip only (no local Blender or deploy-folder copies)."""
+    import re
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    addon_name = "mcp-chat-for-blender"
+    src = open(os.path.join(base_dir, "__init__.py"), encoding="utf-8").read()
+    m = re.search(r'"version":\s*\((\d+),\s*(\d+),\s*(\d+)\)', src)
+    ver = ".".join(m.groups())
+    out_dir = os.path.join(base_dir, out_dir)
+    os.makedirs(out_dir, exist_ok=True)
+    zip_path = os.path.join(out_dir, f"{addon_name}-v{ver}.zip")
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for fname in INCLUDE_FILES:
+            fpath = os.path.join(base_dir, fname)
+            if os.path.exists(fpath):
+                zf.write(fpath, f"{addon_name}/{fname}")
+        for dname in INCLUDE_DIRS:
+            for root, dirs, files in os.walk(os.path.join(base_dir, dname)):
+                dirs[:] = [d for d in dirs if not d.startswith(".") and d != "__pycache__"]
+                for f in files:
+                    if f.startswith(".") or f.endswith((".pyc", ".pyo")):
+                        continue
+                    fpath = os.path.join(root, f)
+                    zf.write(fpath, f"{addon_name}/" + os.path.relpath(fpath, base_dir).replace("\\", "/"))
+    print(f"Created ZIP: {zip_path}")
+
 
 def package():
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -23,25 +71,8 @@ def package():
     print(f"Packaging {addon_name} from: {base_dir}")
 
     # Files and folders to package
-    include_files = [
-        "__init__.py",
-        "blender_bridge.py",
-        "cli_runner.py",
-        "guidelines.py",
-        "i18n.py",
-        "secrets_store.py",
-        "updater.py",
-        "termux_agent.py",
-        "llm_client.py",
-        "mcp_bridge.py",
-        "mcp_handler.py",
-        "server.py",
-        "session_manager.py",
-        "task_queue.py",
-        "README.md",
-        "install_termux.sh",
-    ]
-    include_dirs = ["static"]
+    include_files = INCLUDE_FILES
+    include_dirs = INCLUDE_DIRS
 
     # 1. Update Portable Blender directory cleanly
     addons_parent = os.path.dirname(portable_addon_dir)
@@ -125,4 +156,7 @@ def package():
             print(f"  {e}")
 
 if __name__ == "__main__":
-    package()
+    if "--ci" in sys.argv:
+        package_ci()
+    else:
+        package()

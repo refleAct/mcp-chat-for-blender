@@ -1,4 +1,4 @@
-# 🧊 MCP Chat for Blender  `v0.8.1`
+# 🧊 MCP Chat for Blender  `v0.8.2`
 
 Blender 3D 뷰포트 안에서 **AI와 대화하며 3D 모델링을 시키는 애드온**입니다.
 Claude Code · Codex · agy CLI · OpenRouter 등 여러 AI 엔진을 N패널 채팅창에서 바로 쓰고, AI가 만든 파이썬(bpy) 코드를 작업 큐로 안전하게 실행·저장합니다.
@@ -164,10 +164,10 @@ mcp-chat-for-blender/
 
 ## 10. 버전 규칙
 
-- 현재 버전: **0.8.1**
+- 현재 버전: **0.8.2**
 - **기능 추가**: 0.1 단위로 올림 (0.8 → 0.9 → 1.0 …)
 - **버그 수정**: 0.0.1 단위로 올림 (0.8.1 → 0.8.2 … 최대 0.8.999)
-- Blender `bl_info`에는 `(0, 8, 1)` 형태의 튜플로 기록됩니다. 변경 내역은 [CHANGELOG.md](CHANGELOG.md) 참고.
+- Blender `bl_info`에는 `(0, 8, 2)` 형태의 튜플로 기록됩니다. 변경 내역은 [CHANGELOG.md](CHANGELOG.md) 참고.
 
 ## 11. 출처 및 참조 (Credits)
 
