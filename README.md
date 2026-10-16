@@ -1,4 +1,4 @@
-# 🧊 MCP Chat for Blender  `v0.8.4`
+# 🧊 MCP Chat for Blender  `v0.8.5`
 
 **English** | [한국어](README.ko.md) | [中文](README.zh.md) | [日本語](README.ja.md)
 
@@ -243,10 +243,10 @@ Data location: `~/.config/blender_mcp_chat/` (chat DB, saved .blend/.glb/images)
 
 ## 10. Versioning
 
-- Current version: **0.8.4**
+- Current version: **0.8.5**
 - **New features**: bump by 0.1 (0.8 → 0.9 → 1.0 …)
 - **Bug fixes**: bump by 0.0.1 (0.8.1 → 0.8.2 … up to 0.8.999)
-- Blender's `bl_info` stores it as a tuple such as `(0, 8, 4)`. See [CHANGELOG.md](CHANGELOG.md).
+- Blender's `bl_info` stores it as a tuple such as `(0, 8, 5)`. See [CHANGELOG.md](CHANGELOG.md).
 - Pushing a `v*` tag builds the zip with GitHub Actions and publishes it as a Release automatically.
 - **Releases accumulate, one per version** (older ones are kept). The add-on's **Check for updates** button looks up the *latest* Release and installs it when it is newer than the installed version.
 

@@ -1,4 +1,4 @@
-# 🧊 MCP Chat for Blender  `v0.8.4`
+# 🧊 MCP Chat for Blender  `v0.8.5`
 
 [English](README.md) | [한국어](README.ko.md) | **中文** | [日本語](README.ja.md)
 
@@ -243,10 +243,10 @@ mcp-chat-for-blender/
 
 ## 10. 版本规则
 
-- 当前版本：**0.8.4**
+- 当前版本：**0.8.5**
 - **新增功能**：以 0.1 为单位递增（0.8 → 0.9 → 1.0 …）
 - **修复 Bug**：以 0.0.1 为单位递增（0.8.1 → 0.8.2 … 最多到 0.8.999）
-- Blender 的 `bl_info` 中以 `(0, 8, 4)` 这样的元组记录。变更记录见 [CHANGELOG.md](CHANGELOG.md)。
+- Blender 的 `bl_info` 中以 `(0, 8, 5)` 这样的元组记录。变更记录见 [CHANGELOG.md](CHANGELOG.md)。
 - 推送 `v*` 标签后，GitHub Actions 会自动构建 zip 并发布到 Releases。
 - **Release 按版本累积**（旧版本会保留）。插件设置中的**检查更新**按钮会查询*最新*的 Release，如果比已安装版本新，就用它进行更新。
 

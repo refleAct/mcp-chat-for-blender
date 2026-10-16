@@ -2,6 +2,9 @@
 
 버전 규칙: 기능 추가 = 0.1 단위, 버그 수정 = 0.0.1 단위 (최대 .999)
 
+## 0.8.5
+- Web settings: every provider field (Custom endpoint / key / model, other keys) is optional; blank model or URL falls back to the provider default; fields are labeled optional
+
 ## 0.8.4
 - Web UI works without an API key: chat / plan / auto fall back to an installed CLI (Claude Code → Codex → agy)
 - README: prominent API-key security warning in all four languages

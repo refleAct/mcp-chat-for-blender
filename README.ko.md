@@ -1,4 +1,4 @@
-# 🧊 MCP Chat for Blender  `v0.8.4`
+# 🧊 MCP Chat for Blender  `v0.8.5`
 
 [English](README.md) | **한국어** | [中文](README.zh.md) | [日本語](README.ja.md)
 
@@ -243,10 +243,10 @@ mcp-chat-for-blender/
 
 ## 10. 버전 규칙
 
-- 현재 버전: **0.8.4**
+- 현재 버전: **0.8.5**
 - **기능 추가**: 0.1 단위로 올림 (0.8 → 0.9 → 1.0 …)
 - **버그 수정**: 0.0.1 단위로 올림 (0.8.1 → 0.8.2 … 최대 0.8.999)
-- Blender `bl_info`에는 `(0, 8, 4)` 형태의 튜플로 기록됩니다. 변경 내역은 [CHANGELOG.md](CHANGELOG.md) 참고.
+- Blender `bl_info`에는 `(0, 8, 5)` 형태의 튜플로 기록됩니다. 변경 내역은 [CHANGELOG.md](CHANGELOG.md) 참고.
 - `v*` 태그를 푸시하면 GitHub Actions가 zip을 만들어 Releases에 자동 게시합니다.
 - **릴리즈는 버전별로 누적**됩니다(이전 릴리즈는 지우지 않음). 애드온 설정의 **업데이트 확인** 버튼이 *가장 최신* 릴리즈를 조회해서, 설치된 버전보다 새로우면 그것으로 업데이트합니다.
 
