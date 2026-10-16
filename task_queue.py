@@ -210,9 +210,12 @@ class TaskQueueWorker:
                             [f"<첨부이미지 {k + 1}>" for k in range(n_img)]))
                     except Exception:
                         pass
-                    cli_runner.run_cli_command_async(cli_type, prompt, mode="AUTO", on_complete=_done,
-                                                     images=payload.get("images"))
-                    done_event.wait(timeout=300)
+                    timeout_val = 900
+                    try:
+                        timeout_val = int(mgr.get_setting("cli_timeout", 900))
+                    except Exception:
+                        pass
+                    done_event.wait(timeout=timeout_val)
                     success = cli_res["success"]
                     result_text = cli_res["output"]
                     if not success:

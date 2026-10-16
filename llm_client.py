@@ -11,7 +11,7 @@ import urllib.error
 import ssl
 from typing import List, Dict, Any, Optional, Callable
 from blender_bridge import bridge
-from guidelines import get_guidelines as _get_guidelines
+from guidelines import get_guidelines as _get_guidelines, is_simple_task
 
 
 def _user_rules_block() -> str:
@@ -226,13 +226,15 @@ class LLMClient:
                 break
 
         if last_user_prompt and isinstance(last_user_prompt, str):
-            try:
-                from skill_manager import skill_mgr
-                skill_block = skill_mgr.build_injection_prompt(last_user_prompt)
-                if skill_block:
-                    augmented_system = (augmented_system + "\n" + skill_block).strip()
-            except Exception:
-                pass
+            # Simple tasks skip skill injection to keep context small and fast
+            if not is_simple_task(last_user_prompt):
+                try:
+                    from skill_manager import skill_mgr
+                    skill_block = skill_mgr.build_injection_prompt(last_user_prompt)
+                    if skill_block:
+                        augmented_system = (augmented_system + "\n" + skill_block).strip()
+                except Exception:
+                    pass
 
         if augmented_system:
             api_messages.append({"role": "system", "content": augmented_system})
@@ -301,12 +303,22 @@ class LLMClient:
         else:
             return {"error": f"Unknown tool name: {tool_name}"}
 
-    def chat_step(self, api_messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def chat_step(self, api_messages: List[Dict[str, Any]], task_info: Optional[Dict[str, Any]] = None, is_simple: bool = False) -> Dict[str, Any]:
         """Performs a single HTTP POST call to the chat completion endpoint."""
         model = self.config.get("model", "anthropic/claude-3.5-sonnet")
         temperature = float(self.config.get("temperature", 0.7))
         reasoning_effort = self.config.get("reasoning_effort")
         thinking_budget = self.config.get("thinking_budget")
+
+        # Adaptive Reasoning & Thinking scaling based on task complexity
+        level = (task_info.get("level") if task_info else ("simple" if is_simple else "moderate"))
+        if level == "simple":
+            if reasoning_effort in ("medium", "high"):
+                reasoning_effort = "low"
+            thinking_budget = 0
+        elif level == "moderate":
+            if thinking_budget and str(thinking_budget).isdigit() and int(thinking_budget) > 1024:
+                thinking_budget = 1024
 
         payload = {
             "model": model,
@@ -357,11 +369,35 @@ class LLMClient:
         collected_tool_events = []
         captured_images = []
 
-        for step in range(max_iterations):
-            if on_log_callback:
-                on_log_callback("status", f"AI thinking (Step {step + 1}/{max_iterations})...")
+        # Detect and classify latest user prompt to dynamically scale execution strategy
+        last_prompt = ""
+        for m in reversed(messages):
+            if m.get("role") == "user":
+                c = m.get("content")
+                if isinstance(c, str):
+                    last_prompt = c
+                elif isinstance(c, list):
+                    for part in c:
+                        if isinstance(part, dict) and part.get("type") == "text":
+                            last_prompt = part.get("text", "")
+                            break
+                break
 
-            response = self.chat_step(api_messages)
+        task_info = {"level": "moderate", "max_agent_turns": max_iterations}
+        try:
+            from skill_manager import skill_mgr
+            task_info = skill_mgr.classify_task(last_prompt)
+        except Exception:
+            pass
+
+        level = task_info.get("level", "moderate")
+        effective_iterations = min(max_iterations, task_info.get("max_agent_turns", max_iterations))
+
+        for step in range(effective_iterations):
+            if on_log_callback:
+                on_log_callback("status", f"AI thinking ({level.upper()}, Step {step + 1}/{effective_iterations})...")
+
+            response = self.chat_step(api_messages, task_info=task_info, is_simple=(level == "simple"))
             choices = response.get("choices", [])
             if not choices:
                 raise RuntimeError("No choices returned from LLM response.")

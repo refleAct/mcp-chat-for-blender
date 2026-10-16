@@ -105,8 +105,12 @@ class SkillManager:
         scored_skills.sort(key=lambda x: x[0], reverse=True)
         return [item[1] for item in scored_skills[:max_count]]
 
-    def read_skill_content(self, skill_item: Dict[str, Any]) -> str:
-        """Reads markdown content for a skill file."""
+    def read_skill_content(self, skill_item: Dict[str, Any], compact: bool = True) -> str:
+        """
+        Reads markdown content for a skill file.
+        When compact=True, distills the content to rules and code snippets to prevent context bloat.
+        When compact=False, returns the complete raw documentation.
+        """
         rel_file = skill_item.get("file", "")
         if not rel_file:
             return ""
@@ -124,18 +128,133 @@ class SkillManager:
                         parts = text.split("---", 2)
                         if len(parts) >= 3:
                             text = parts[2].strip()
-                    return text
+
+                    if not compact:
+                        return text
+
+                    # Compact mode: Distill rules, directives, and verified code blocks
+                    lines = text.splitlines()
+                    compact_lines = []
+                    in_code = False
+                    for line in lines:
+                        sline = line.strip()
+                        if sline.startswith("```"):
+                            in_code = not in_code
+                            compact_lines.append(line)
+                            continue
+                        if in_code:
+                            compact_lines.append(line)
+                            continue
+                        # Keep section headers, bullet points, numbered lists, and directives
+                        if sline.startswith("#") or sline.startswith("-") or sline.startswith("*"):
+                            compact_lines.append(line)
+                        elif len(sline) > 2 and sline[0].isdigit() and sline[1] in (".", ")"):
+                            compact_lines.append(line)
+                        elif sline.startswith("Prime Directive:") or sline.startswith("Summary:"):
+                            compact_lines.append(line)
+
+                    result = "\n".join(compact_lines).strip()
+                    if len(result) > 40:
+                        return result
+                    return text[:1200]
             except Exception:
                 pass
 
         # If file not yet on disk, return summary recipe
         return f"## Skill: {skill_item.get('name')}\nSummary: {skill_item.get('summary', '')}"
 
+    def classify_task(self, prompt: str) -> Dict[str, Any]:
+        """
+        Classifies task complexity into 'simple', 'moderate', or 'complex'.
+        Returns structured metadata including domain, matched skills, recommended reasoning effort,
+        thinking budget, and max agent iterations.
+        """
+        if not prompt or not isinstance(prompt, str):
+            return {
+                "level": "simple",
+                "domain": None,
+                "matched_skills": [],
+                "recommended_effort": "low",
+                "recommended_thinking_budget": 0,
+                "max_agent_turns": 2,
+                "skip_scene_inspection": True,
+            }
+
+        p = prompt.strip().lower()
+
+        # Check for complex indicators:
+        # Long text, multi-line, multi-step pipeline conjunctions, or heavy domain tasks
+        is_long = len(p) > 100 or "\n" in p
+        complex_triggers = (
+            "plan", "계획", "단계", "step", "리깅", "아마추어", "rig", "bone",
+            "ik", "웨이트", "weight", "익스포트", "export", "fbx", "gltf",
+            "애니메이션", "animation", "시뮬레이션", "simulation", "물리", "physics",
+            "천 물리", "cloth", "베이킹", "baking", "언랩", "unwrap", "retopology",
+            "리토폴로지", "모듈러", "modular", "지형", "landscape", "terrain",
+            "스컬핑", "sculpt", "인체", "캐릭터", "character", "건물", "building",
+            "인테리어", "interior", "하고 난", "한 다음", "한 뒤", "and then", "after that"
+        )
+        is_complex = is_long or any(k in p for k in complex_triggers)
+
+        # Check for simple indicators
+        simple_patterns = (
+            "큐브", "정육면체", "cube", "구체", "sphere", "uv sphere", "ico sphere",
+            "원통", "실린더", "cylinder", "원뿔", "cone", "평면", "plane", "그리드", "grid",
+            "토러스", "torus", "도넛", "수잔", "원숭이", "monkey", "suzanne",
+            "엠티", "empty", "카메라 하나", "조명 하나", "light 하나", "점광원", "point light",
+            "삭제", "지워", "delete", "remove", "clear", "초기화", "reset",
+            "색상", "색깔", "color", "빨간", "파란", "노란", "초록", "검은", "하얀", "흰색",
+            "스케일", "크기", "scale", "회전", "rotate", "이동", "move", "숨겨", "hide"
+        )
+        is_simple = (not is_complex) and len(p) <= 80 and any(k in p for k in simple_patterns)
+
+        domain = self.detect_domain(prompt)
+
+        if is_simple:
+            return {
+                "level": "simple",
+                "domain": domain,
+                "matched_skills": [],
+                "recommended_effort": "low",
+                "recommended_thinking_budget": 0,
+                "max_agent_turns": 2,
+                "skip_scene_inspection": True,
+            }
+
+        matched = self.match_skills(prompt, max_count=2 if is_complex else 1)
+
+        if is_complex:
+            return {
+                "level": "complex",
+                "domain": domain,
+                "matched_skills": matched,
+                "recommended_effort": "high",
+                "recommended_thinking_budget": 2048,
+                "max_agent_turns": 6,
+                "skip_scene_inspection": False,
+            }
+
+        # Moderate
+        return {
+            "level": "moderate",
+            "domain": domain,
+            "matched_skills": matched,
+            "recommended_effort": "medium",
+            "recommended_thinking_budget": 1024,
+            "max_agent_turns": 4,
+            "skip_scene_inspection": False,
+        }
+
     def build_injection_prompt(self, prompt: str) -> str:
         """
         Synthesizes a compact, dynamic context block with matched skills and plugin strategies.
+        Uses task classification to inject only the necessary skills.
         """
-        matched = self.match_skills(prompt, max_count=2)
+        info = self.classify_task(prompt)
+        if info["level"] == "simple":
+            return ""
+
+        matched = info.get("matched_skills", [])
         if not matched:
             return ""
 
@@ -143,7 +262,7 @@ class SkillManager:
         collected_addons = set()
 
         for skill in matched:
-            content = self.read_skill_content(skill)
+            content = self.read_skill_content(skill, compact=True)
             parts.append(f"\n--- SKILL: {skill.get('name')} ({skill.get('id')}) ---")
             parts.append(content)
             for addon in skill.get("optional_addons", []):
@@ -179,7 +298,7 @@ class SkillManager:
                 "id": s.get("id"),
                 "name": s.get("name"),
                 "summary": s.get("summary"),
-                "recipe": self.read_skill_content(s)
+                "recipe": self.read_skill_content(s, compact=False)
             })
 
         return {

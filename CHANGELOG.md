@@ -2,6 +2,24 @@
 
 버전 규칙: 기능 추가 = 0.1 단위, 버그 수정 = 0.0.1 단위 (최대 .999)
 
+## 0.9.2
+- Task Complexity Architecture (3-Tier Adaptive Dispatch):
+  - Added `classify_task()` to `skill_manager.py`: categorizes user prompts into `simple`, `moderate`, and `complex` levels.
+  - Adaptive Agent Iterations: automatically constrains agent turn loops (simple: 2 turns, moderate: 4 turns, complex: 6 turns) to prevent infinite loops and needless roundtrips.
+  - Granular Reasoning & Thinking Scaling:
+    - `simple`: reasoning effort `low`, thinking budget 0, 0 skills injected.
+    - `moderate`: reasoning effort `medium`, thinking budget max 1024, only 1 relevant skill injected.
+    - `complex`: reasoning effort `high`, thinking budget up to 2048, up to 2 skills injected with 900s timeout resilience.
+  - Unified CLI parameter alignment: Claude Code and Codex CLI automatically inherit the classified task complexity level.
+
+## 0.9.1
+- Fast Path (Adaptive Speed Optimization):
+  - guidelines v5: simple standalone creations (primitives, direct tweaks) execute immediately without calling get_scene_info first.
+  - Zero-latency task complexity classifier (`is_simple_task`): automatically detects lightweight prompts.
+  - Dynamic reasoning scaling: simple tasks bypass heavy thinking budget (0 tokens) and downgrade reasoning effort to `low` across Direct API, Claude Code, and Codex CLI.
+  - Skill Context Distillation: compact injection mode extracts only essential rules and verified bpy code blocks to prevent prompt bloat while preserving all 35 skills; full documentation remains accessible via `lookup_blender_skill`.
+  - Timeout Resilience: extended default CLI execution and queue wait timeout from 300s to 900s (15 min) to prevent premature task cancellation on heavy 3D builds.
+
 ## 0.9.0
 - Skills Vault & Dynamic 2-Tier Injection: integrated 29 specialized skills across 10 domains with zero prompt bloat
 - Plugin Autonomy: detects installed Blender addons (Node Wrangler, Rigify, Bool Tool, LoopTools), auto-enables, and provides graceful fallback to standard bpy

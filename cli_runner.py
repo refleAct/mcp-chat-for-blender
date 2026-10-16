@@ -385,10 +385,12 @@ class CLIRunner:
                       + nl0.join("- " + p for p in image_paths))
 
         try:
-            from skill_manager import skill_mgr
-            sb = skill_mgr.build_injection_prompt(prompt)
-            if sb:
-                guidelines = (guidelines + "\n" + sb).strip() + "\n\n"
+            from guidelines import is_simple_task
+            if not is_simple_task(prompt):
+                from skill_manager import skill_mgr
+                sb = skill_mgr.build_injection_prompt(prompt)
+                if sb:
+                    guidelines = (guidelines + "\n" + sb).strip() + "\n\n"
         except Exception:
             pass
 
@@ -427,12 +429,25 @@ class CLIRunner:
     def build_command(cli_type: str, bin_path: str, mode: str, prompt: str,
                       opts: Dict[str, str], guidelines: str, image_paths=None):
         """returns (cmd list, stdin_text or None)"""
+        level = "moderate"
+        try:
+            from skill_manager import skill_mgr
+            level = skill_mgr.classify_task(prompt)["level"]
+        except Exception:
+            from guidelines import is_simple_task
+            level = "simple" if is_simple_task(prompt) else "moderate"
+
         full_prompt = CLIRunner.compose_prompt(cli_type, mode, prompt, guidelines, image_paths)
         stdin_text = None
 
         if cli_type == "claude":
+            effort = opts.get("claude_effort") or "medium"
+            if level == "simple":
+                effort = "low"
+            elif level == "moderate" and effort == "high":
+                effort = "medium"
             cmd = [bin_path, "--model", opts.get("claude_model") or "opus",
-                   "--effort", opts.get("claude_effort") or "medium"]
+                   "--effort", effort]
             if mode == "PLAN":
                 cmd += ["--permission-mode", "plan"]
             else:
@@ -443,7 +458,12 @@ class CLIRunner:
             cmd = [bin_path, "exec", "--skip-git-repo-check"]
             if opts.get("codex_model"):
                 cmd += ["-m", opts["codex_model"]]
-            cmd += ["-c", f'model_reasoning_effort="{opts.get("codex_effort") or "medium"}"']
+            effort = opts.get("codex_effort") or "medium"
+            if level == "simple":
+                effort = "low"
+            elif level == "moderate" and effort == "high":
+                effort = "medium"
+            cmd += ["-c", f'model_reasoning_effort="{effort}"']
             cmd += ["--sandbox", "read-only"] if mode == "PLAN" else ["--dangerously-bypass-approvals-and-sandbox"]
             for _p in (image_paths or []):
                 cmd += ["-i", _p]
@@ -451,8 +471,9 @@ class CLIRunner:
             stdin_text = full_prompt
 
         else:  # agy
+            effort = opts.get("agy_effort") or "low"
             cmd = [bin_path, "--model", opts.get("agy_model") or "gemini-3.8-flash-low",
-                   "--effort", opts.get("agy_effort") or "low", "--dangerously-skip-permissions"]
+                   "--effort", effort, "--dangerously-skip-permissions"]
             if mode == "AUTO":
                 cmd += ["--mode", "auto"]
             elif mode == "PLAN":
@@ -462,11 +483,17 @@ class CLIRunner:
         return cmd, stdin_text
 
     def run_local_sync(self, cli_type: str, prompt: str, mode: str,
-                       opts: Dict[str, str], guidelines: str, timeout: int = 300,
+                       opts: Dict[str, str], guidelines: str, timeout: Optional[int] = None,
                        image_paths=None) -> Tuple[bool, str]:
         bin_path = self.find_cli(cli_type)
         if not bin_path:
             return False, f"{cli_type} CLI binary not found on this device."
+        if timeout is None:
+            try:
+                import session_manager
+                timeout = int(session_manager.session_mgr.get_setting("cli_timeout", 900))
+            except Exception:
+                timeout = 900
         is_win = (platform.system() == "Windows")
         use_shell = is_win and bin_path.lower().endswith((".cmd", ".bat"))
         cmd, stdin_text = self.build_command(cli_type, bin_path, mode, prompt, opts, guidelines, image_paths)
