@@ -342,6 +342,21 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
                 "temperature": float(settings.get("temperature", 0.7))
             }
 
+            # API 키가 없으면 설정 없이도 쓸 수 있도록 설치된 CLI(Claude Code 등)로 대신 처리
+            if not provider_ready(settings, active_provider):
+                cli = cli_runner.pick_cli()
+                if cli is None:
+                    err_msg = session_mgr.add_message(session_id=session_id, role="assistant", content="⚠️ " + NO_ENGINE_MSG)
+                    self._send_json(200, {"status": "success", "reply": err_msg, "session": session_mgr.get_session(session_id)})
+                    return
+                ok, out = cli_runner.run_cli_sync(cli, user_content, "CHAT", images)
+                text = _clean_cli_output(out) or "(응답 없음)"
+                reply = session_mgr.add_message(
+                    session_id=session_id, role="assistant",
+                    content=(text if ok else "⚠️ " + text) + ("\n\n✅ 생성이 완료되었습니다." if ok else ""))
+                self._send_json(200, {"status": "success", "reply": reply, "session": session_mgr.get_session(session_id)})
+                return
+
             # Run agent loop
             client = LLMClient(provider_config)
             
@@ -438,6 +453,15 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
 
             settings = session_mgr.get_all_settings(include_secrets=True)
             provider = body.get("provider") or settings.get("active_provider", "openrouter")
+            if not provider_ready(settings, provider):
+                cli = cli_runner.pick_cli()
+                if cli is None:
+                    self._send_json(200, {"status": "success", "plan": {"plan_title": "AI 엔진 없음", "summary": NO_ENGINE_MSG, "steps": []}})
+                    return
+                ok, out = cli_runner.run_cli_sync(cli, prompt, "PLAN", body.get("images") or [])
+                self._send_json(200, {"status": "success", "plan": {
+                    "plan_title": "Plan (" + cli + ")", "summary": _clean_cli_output(out), "steps": []}})
+                return
             model = body.get("model") or settings.get(f"{provider}_model", "anthropic/claude-3.5-sonnet")
             api_key = settings.get(f"{provider}_api_key", "")
             base_url = settings.get(f"{provider}_base_url", "")
@@ -468,11 +492,24 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
                 # 하나의 지시 = 하나의 큐 작업 (계획 생성/단계 실행은 작업 내부에서 처리)
                 task_queue.resume()
                 task_queue.start()
-                task = session_mgr.enqueue_task(
-                    title=prompt.splitlines()[0][:30],
-                    task_type="auto_plan",
-                    payload={"prompt": prompt, "backend": "API"}
-                )
+                _settings = session_mgr.get_all_settings(include_secrets=True)
+                _provider = body.get("provider") or _settings.get("active_provider", "openrouter")
+                if provider_ready(_settings, _provider):
+                    task = session_mgr.enqueue_task(
+                        title=prompt.splitlines()[0][:30],
+                        task_type="auto_plan",
+                        payload={"prompt": prompt, "backend": "API", "images": body.get("images") or []}
+                    )
+                else:
+                    cli = cli_runner.pick_cli()
+                    if cli is None:
+                        self._send_json(200, {"status": "error", "error": NO_ENGINE_MSG})
+                        return
+                    task = session_mgr.enqueue_task(
+                        title=prompt.splitlines()[0][:30],
+                        task_type="prompt",
+                        payload={"prompt": prompt, "backend": cli.upper(), "images": body.get("images") or []}
+                    )
                 self._send_json(200, {
                     "status": "auto_started",
                     "task": task,
@@ -567,6 +604,24 @@ class BlenderMCPRequestHandler(BaseHTTPRequestHandler):
             self.send_response(500)
             self.end_headers()
             self.wfile.write(str(e).encode("utf-8"))
+
+
+def provider_ready(settings: dict, provider: str) -> bool:
+    """Direct API를 바로 쓸 수 있는지 (키/주소가 설정되어 있는지)."""
+    if provider == "local":
+        return True
+    if provider == "custom":
+        return bool(settings.get("custom_api_key") or settings.get("custom_base_url"))
+    return bool(settings.get(f"{provider}_api_key"))
+
+
+NO_ENGINE_MSG = ("사용할 수 있는 AI 엔진이 없습니다. API 키를 설정하거나(설정 ⚙), "
+                 "PC에 Claude Code(`claude`) CLI를 설치한 뒤 다시 시도하세요.")
+
+
+def _clean_cli_output(text: str) -> str:
+    import re
+    return re.sub(r"\x1b\[[0-9;]*m", "", text or "").strip()
 
 
 _TERMUX_SCRIPT = r'''#!/usr/bin/env bash

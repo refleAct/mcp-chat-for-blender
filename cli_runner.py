@@ -535,6 +535,31 @@ class CLIRunner:
                 "Termux를 닫거나 Android가 앱을 정리하면 Agent가 종료됩니다. Termux 알림의 'Acquire wakelock'을 켜 두세요."
             )
 
+    def run_cli_sync(self, cli_type: str, prompt: str, mode: str = "CHAT", images=None) -> Tuple[bool, str]:
+        """로컬 또는 Termux Agent로 CLI를 실행하고 결과를 기다린다 (웹 UI 등 동기 호출용)."""
+        opts = self.collect_opts()
+        guidelines = self.build_guidelines()
+        _, _, forced = self.agent_settings()
+        if forced or not self.find_cli(cli_type):
+            return self.run_remote_sync(cli_type, prompt, mode, opts, guidelines, images)
+        return self.run_local_sync(cli_type, prompt, mode, opts, guidelines, image_paths=self.save_images(images))
+
+    def pick_cli(self) -> Optional[str]:
+        """사용할 수 있는 CLI 엔진 선택 (기본 claude → codex → agy). 로컬에 없으면 Termux Agent가 감지한 것."""
+        for name in ("claude", "codex", "agy"):
+            if self.find_cli(name):
+                return name
+        try:
+            ok, _ = self.agent_health()
+            if ok:
+                info = self.agent_request("/health", timeout=4)
+                for name in ("claude", "codex", "agy"):
+                    if info.get(name):
+                        return name
+        except Exception:
+            pass
+        return None
+
     def run_cli_command_async(self, cli_type: str, prompt: str, mode: str = "CHAT", on_complete=None, images=None):
         """
         claude / agy / codex 실행 (백그라운드 스레드).

@@ -2,6 +2,10 @@
 
 버전 규칙: 기능 추가 = 0.1 단위, 버그 수정 = 0.0.1 단위 (최대 .999)
 
+## 0.8.4
+- Web UI works without an API key: chat / plan / auto fall back to an installed CLI (Claude Code → Codex → agy)
+- README: prominent API-key security warning in all four languages
+
 ## 0.8.3
 - Author/maintainer shown as **refleaction** (add-on info, LICENSE, README)
 - README in English / 한국어 / 中文 / 日本語 with real English UI screenshots; API-key storage notes; manual MCP setup for each CLI

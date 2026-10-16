@@ -1,4 +1,4 @@
-# 🧊 MCP Chat for Blender  `v0.8.3`
+# 🧊 MCP Chat for Blender  `v0.8.4`
 
 **English** | [한국어](README.ko.md) | [中文](README.zh.md) | [日本語](README.ja.md)
 
@@ -10,8 +10,12 @@ Use Claude Code, Codex, the agy CLI, OpenRouter and more directly from the N-pan
 > Blender for Android (APK) cannot run the `claude` installed in Termux because of the app sandbox, so the add-on ships a relay server (`termux_agent.py`) that runs in Termux and forwards requests. The code and install script are included, but **I have not been able to confirm that it works end to end on a real Android device.**
 > The only setup verified to work is **Blender on a Windows PC + Claude Code installed on the same PC**. Codex CLI, agy CLI and macOS/Linux were written but not verified.
 
-> ## 🔑 Important: how API keys are stored
-> API keys and tokens are saved **encrypted inside the add-on folder (`.vault/`)** and are **deleted together with the add-on**. Please read [section 8](#8-api-key-storage-notes-important) before entering a key — in particular: protection strength depends on your OS, **updating by replacing the add-on folder wipes the keys**, and keys cannot be recovered if the vault is lost.
+> ## 🚨 API KEY SECURITY WARNING
+> - **Use a dedicated key with a spending limit** (a separate key/project with a budget cap). Never use your main or production key. Auto mode can send many requests, and **this add-on does not cap your spending.**
+> - Keys are saved **encrypted inside the add-on folder (`.vault/`)** and are **deleted together with the add-on** — but the encryption is **best-effort**: it stops casual leaks (screenshots, copied files), **not** malware or anyone who can log in as you. On Android without `openssl` it is only weak obfuscation.
+> - **Never share** the `.vault/` folder, screenshots of the preferences screen, or old backups (older versions stored keys in plain text). If a key might have leaked, **revoke it at the provider immediately.**
+> - **Updating by replacing the add-on folder wipes your keys**; keys cannot be recovered if the vault is lost. Details: [section 8](#8-api-key-storage-notes-important).
+> - You do **not** need an API key to use the add-on with Claude Code / Codex / agy CLI or the web UI — those use their own login.
 
 ---
 
@@ -105,6 +109,7 @@ Example: `Bevel with 2 segments; black vertex color on bevel faces`
 
 ### 4-6. Server / web UI
 - Start the server from the add-on preferences and open `http://127.0.0.1:8000` for the web chat UI.
+- **No API key is required for the web UI:** if no key is set it automatically uses an installed CLI (Claude Code, then Codex, then agy). Set a key in ⚙ settings only if you want the Direct API.
 - External AI such as Claude Code controls Blender through `http://127.0.0.1:8000/mcp`.
 
 ### 4-7. Connect your own AI CLI to Blender by MCP (manual setup)
@@ -238,10 +243,10 @@ Data location: `~/.config/blender_mcp_chat/` (chat DB, saved .blend/.glb/images)
 
 ## 10. Versioning
 
-- Current version: **0.8.3**
+- Current version: **0.8.4**
 - **New features**: bump by 0.1 (0.8 → 0.9 → 1.0 …)
 - **Bug fixes**: bump by 0.0.1 (0.8.1 → 0.8.2 … up to 0.8.999)
-- Blender's `bl_info` stores it as a tuple such as `(0, 8, 3)`. See [CHANGELOG.md](CHANGELOG.md).
+- Blender's `bl_info` stores it as a tuple such as `(0, 8, 4)`. See [CHANGELOG.md](CHANGELOG.md).
 - Pushing a `v*` tag builds the zip with GitHub Actions and publishes it as a Release automatically.
 - **Releases accumulate, one per version** (older ones are kept). The add-on's **Check for updates** button looks up the *latest* Release and installs it when it is newer than the installed version.
 
